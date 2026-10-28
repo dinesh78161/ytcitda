@@ -1,0 +1,264 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Aarogya Drishti integration API",
+    "version": "0.1.0",
+    "description": "Synthetic demonstration only. Database workflows use authenticated Supabase RPCs documented in docs/API_CONTRACT.md. Status flags report configuration presence, not provider connectivity."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "staffToken": [] }],
+  "paths": {
+    "/api/status": {
+      "get": {
+        "summary": "Read configuration flags",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Configuration flags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "database": { "type": "boolean" },
+                    "files": { "type": "boolean" },
+                    "video": { "type": "boolean" },
+                    "video_provider": {
+                      "enum": ["livekit", "daily", "disabled"]
+                    },
+                    "ai": { "type": "boolean" },
+                    "ai_provider": { "enum": ["mock", "research", "disabled"] },
+                    "reminders": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/upload": {
+      "post": {
+        "summary": "Store a private image or report with retry protection",
+        "description": "Verifies active staff, role, patient assignment and current consent. Oral files are decoded JPEG; reports are JPEG or safe unencrypted PDF. Reuse the same request_id for the same actor/file/destination. Changed content with an existing ID returns 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Upload" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored record ID; oral images also include quality_status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "quality_status": { "enum": ["acceptable", "recapture"] }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/download": {
+      "post": {
+        "summary": "Audit access and issue a 60-second signed download URL",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["id", "kind"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "kind": { "enum": ["oral", "report"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private signed URL; never log or publish it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": { "type": "string", "format": "uri" },
+                    "expires_in": { "const": 60 }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/analyze": {
+      "post": {
+        "summary": "Store a labelled mock or pinned research result",
+        "description": "Requires an assigned acceptable-quality image and current photo consent. Analysis cannot make a clinical decision. Disabled or unavailable research mode never falls back to mock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["image_id"],
+                "properties": {
+                  "image_id": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persisted nonclinical result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "provider": { "enum": ["mock", "research"] },
+                    "model_version": { "type": "string" },
+                    "research_label": { "type": "string" },
+                    "score": {
+                      "type": ["number", "null"],
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "clinical_use": { "const": false },
+                    "requires_clinician_review": { "const": true },
+                    "warning": { "const": "NOT FOR CLINICAL USE" }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/video": {
+      "post": {
+        "summary": "Authorize one scheduled consultation",
+        "description": "Health worker or clinician only, with patient assignment and current teleconsultation consent. Join opens 15 minutes before start and ends 15 minutes after end. A rescheduled appointment gets a different room. LiveKit token expiry limits joining; see documentation for in-call revocation limits.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["appointment_id"],
+                "properties": {
+                  "appointment_id": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short-lived room access; never log tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "provider",
+                        "server_url",
+                        "token",
+                        "room_name",
+                        "expires_at"
+                      ],
+                      "properties": {
+                        "provider": { "const": "livekit" },
+                        "server_url": { "type": "string", "format": "uri" },
+                        "token": { "type": "string" },
+                        "room_name": { "type": "string" },
+                        "expires_at": { "type": "integer" }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": ["provider", "url", "expires_at"],
+                      "properties": {
+                        "provider": { "const": "daily" },
+                        "url": { "type": "string", "format": "uri" },
+                        "expires_at": { "type": "integer" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "staffToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Supabase access token"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "400 invalid input; 401 missing/expired session; 403 access/consent denied; 409 conflict; 413 oversized body; 415 wrong content type; 429 rate limit; 502 provider/storage failure; 503 configuration unavailable",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["error"],
+              "properties": { "error": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Upload": {
+        "type": "object",
+        "required": ["kind", "patient_id", "data_url"],
+        "properties": {
+          "kind": { "enum": ["oral", "report"] },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable UUID for retries; current browser derives this from actor, file and destination."
+          },
+          "patient_id": { "type": "string", "format": "uuid" },
+          "data_url": {
+            "type": "string",
+            "description": "Base64 data:image/jpeg or data:application/pdf. File limit 10 MiB; request limit 15 MiB; JPEG up to 4 megapixels, PDF up to 100 pages."
+          },
+          "oral_view": {
+            "enum": ["cheek", "tongue", "palate", "gums", "floor_of_mouth"]
+          },
+          "investigation_id": { "type": ["string", "null"], "format": "uuid" },
+          "name": { "type": "string", "maxLength": 150 }
+        }
+      }
+    }
+  }
+}

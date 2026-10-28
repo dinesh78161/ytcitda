@@ -985,6 +985,18 @@ function Registration({ onClose }: { onClose: () => void }) {
   }, [form, ready]);
   const change = (key: string, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
+  const normalize = (value: unknown) =>
+    String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase();
+  const possibleDuplicates = w.data.patients.filter(
+    (p) =>
+      normalize(form.display_name).length > 1 &&
+      normalize(p.display_name) === normalize(form.display_name) &&
+      (normalize(p.village) === normalize(form.village) ||
+        p.age_years === Number(form.age_years)),
+  );
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -1061,6 +1073,14 @@ function Registration({ onClose }: { onClose: () => void }) {
           <span>02</span>
           {t("history")}
         </div>
+        {possibleDuplicates.length > 0 && (
+          <div className="form-notice" role="status">
+            {t("duplicateWarning")}{" "}
+            {possibleDuplicates
+              .map((p) => `${p.display_name} (${shortId(p.id)})`)
+              .join(", ")}
+          </div>
+        )}
         <div className="form-grid">
           <Field label={t("tobacco")}>
             <select
@@ -1317,7 +1337,11 @@ function PatientDetail({
                       accept="image/jpeg,image/png,image/webp"
                       capture="environment"
                       disabled={imageBusy || w.busy}
-                      onChange={(e) => void upload(e.target.files?.[0])}
+                      onChange={(e) => {
+                        const file = e.currentTarget.files?.[0];
+                        e.currentTarget.value = "";
+                        void upload(file);
+                      }}
                     />
                   </label>
                 )}
@@ -1396,7 +1420,7 @@ function PatientDetail({
                             }
                           >
                             <Sparkles size={15} />
-                            {isCloud
+                            {isCloud && w.services.ai_provider !== "mock"
                               ? lang === "te"
                                 ? "పరిశోధన విశ్లేషణ"
                                 : "Run research analysis"

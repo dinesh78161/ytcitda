@@ -3,8 +3,43 @@ export interface ServiceStatus {
   database: boolean;
   files: boolean;
   video: boolean;
+  video_provider?: "livekit" | "daily" | "disabled";
   ai: boolean;
+  ai_provider?: "mock" | "research" | "disabled";
   reminders: boolean;
+}
+export type VideoAccess =
+  | {
+      provider: "livekit";
+      server_url: string;
+      token: string;
+      room_name: string;
+      expires_at: number;
+    }
+  | { provider?: "daily"; url: string; expires_at: number };
+export async function uploadRequestId(
+  actor: string,
+  kind: string,
+  payload: Record<string, unknown>,
+) {
+  const content = JSON.stringify([
+    actor,
+    kind,
+    payload.patient_id,
+    payload.oral_view ?? null,
+    payload.investigation_id ?? null,
+    payload.name ?? null,
+    payload.preview,
+  ]);
+  const hash = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content)),
+  );
+  hash[6] = (hash[6] & 15) | 128; // UUIDv8: deterministic application-defined upload identity.
+  hash[8] = (hash[8] & 63) | 128;
+  const hex = [...hash.slice(0, 16)]
+    .map((n) => n.toString(16).padStart(2, "0"))
+    .join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 export async function serviceStatus(): Promise<ServiceStatus> {
   const response = await fetch("/api/status", {

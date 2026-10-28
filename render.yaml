@@ -20,3 +20,5 @@ services:
         sync: false
       - key: REMINDER_DELIVERY_ENABLED
         value: "false"
+      - key: SCREENING_AI_MODE
+        value: mock

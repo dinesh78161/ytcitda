@@ -14,7 +14,7 @@ flowchart LR
     Queue -->|reconnect and acknowledge| Mode
     UI --> API[Authenticated Node API]
     API --> Storage[Private Supabase Storage]
-    API --> Daily[Appointment-scoped video]
+    API --> Video[LiveKit / Daily appointment-scoped video]
     API --> Model[Configured research model]
     API --> Delivery[Optional reminder webhook]
 ```
@@ -64,7 +64,7 @@ District reports include completed/all follow-up tasks, completion rate, outreac
 attendance/screening totals and active treatments. Admins receive aggregate values only.
 Existing device-local demo data is upgraded without discarding patients or drafts.
 
-`server/index.mjs` supplies session-verified file, Daily video and research-model endpoints.
+`server/index.mjs` supplies session-verified file, LiveKit/Daily video and mock/research endpoints.
 `server/validation.mjs` decodes files and validates model output. No configured service
 is emulated as a successful live call. See [integration setup](INTEGRATIONS.md).
 
@@ -83,7 +83,7 @@ See the [demo runbook](DEMO_RUNBOOK.md) for an end-to-end acceptance walkthrough
 
 1. Configure hosted Supabase and verify each account's access through the Data API.
 2. Configure the Node API and test private image/report access against hosted Storage.
-3. Configure Daily and test two accounts on separate devices; verify camera/microphone behavior.
+3. Configure a free LiveKit Build project (or Daily) and test two accounts on separate devices; verify camera/microphone behavior.
 4. Staff assignments currently use Supabase administration. Optional operational
    extensions include self-service staff administration and immediate provider-token revocation.
 5. Calibrate image-quality checks on licensed media. A research classifier remains

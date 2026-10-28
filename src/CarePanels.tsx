@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { CalendarDays, Download, FileText, Plus, Video } from "lucide-react";
 import { Badge, Field, Modal, useApp } from "./App";
 import { isCloud } from "./lib/client";
 import { hasConsent } from "./lib/care-workflows";
-import { careApi, downloadUrl, fileDataUrl } from "./lib/services";
+import {
+  careApi,
+  downloadUrl,
+  fileDataUrl,
+  type VideoAccess,
+} from "./lib/services";
 import { inspectImage } from "./lib/image-quality";
 import { latestScreening } from "./lib/journey";
 import type { Appointment, Patient } from "./lib/types";
+const LiveConsultation = lazy(() => import("./LiveConsultation"));
 
 const localDateTime = (date: string) => {
   const d = new Date(date);
@@ -489,11 +495,11 @@ export function AppointmentTools({
 }: {
   appointment: Appointment;
 }) {
-  const { w, run } = useApp(),
+  const { w, run, lang } = useApp(),
     l = useWords();
   const [editing, setEditing] = useState(false),
     [starts, setStarts] = useState(localDateTime(a.starts_at)),
-    [video, setVideo] = useState(""),
+    [video, setVideo] = useState<VideoAccess | null>(null),
     [joining, setJoining] = useState(false);
   const canEdit = ["medical_officer", "specialist", "navigator"].includes(
       w.profile?.role || "",
@@ -504,10 +510,10 @@ export function AppointmentTools({
   async function join() {
     setJoining(true);
     await run(async () => {
-      const result = await careApi<{ url: string }>("video", {
+      const result = await careApi<VideoAccess>("video", {
         appointment_id: a.id,
       });
-      setVideo(result.url);
+      setVideo(result);
     });
     setJoining(false);
   }
@@ -633,18 +639,32 @@ export function AppointmentTools({
       {video && (
         <Modal
           title={l("Private consultation", "వ్యక్తిగత సంప్రదింపు")}
-          onClose={() => setVideo("")}
+          onClose={() => setVideo(null)}
         >
-          <iframe
-            className="video-room"
-            src={video}
-            title="Video consultation"
-            allow="camera; microphone; fullscreen; speaker-selection"
-            referrerPolicy="no-referrer"
-          />
-          <button className="button secondary" onClick={() => setVideo("")}>
-            {l("Leave consultation", "సంప్రదింపు ముగించు")}
-          </button>
+          {video.provider === "livekit" ? (
+            <Suspense
+              fallback={<p>{l("Loading video…", "వీడియో లోడ్ అవుతోంది…")}</p>}
+            >
+              <LiveConsultation
+                access={video}
+                appointmentId={a.id}
+                lang={lang}
+              />
+            </Suspense>
+          ) : (
+            <iframe
+              className="video-room"
+              src={video.url}
+              title="Video consultation"
+              allow="camera; microphone; fullscreen; speaker-selection"
+              referrerPolicy="no-referrer"
+            />
+          )}
+          <div className="modal-footer">
+            <button className="button secondary" onClick={() => setVideo(null)}>
+              {l("Leave consultation", "సంప్రదింపు ముగించు")}
+            </button>
+          </div>
         </Modal>
       )}
     </>
@@ -874,16 +894,21 @@ export function IntegrationStatus() {
           ["database", "Database", "డేటాబేస్"],
           ["files", "Private files", "వ్యక్తిగత ఫైళ్లు"],
           ["video", "Video consultation", "వీడియో సంప్రదింపు"],
-          ["ai", "Research screening model", "పరిశోధన పరీక్ష మోడల్"],
+          ["ai", "Image analysis", "చిత్ర విశ్లేషణ"],
           ["reminders", "Reminder delivery", "రిమైండర్ పంపిణీ"],
         ] as const
       ).map(([key, en, te]) => (
         <div className="consent-row" key={key}>
           <span>{l(en, te)}</span>
           <span className="badge">
-            {w.services[key]
-              ? l("Configured", "అమర్చబడింది")
-              : l("Not configured", "అమర్చలేదు")}
+            {key === "ai" && w.services.ai_provider === "mock"
+              ? l(
+                  "Mock demonstration · no prediction",
+                  "మాక్ ప్రదర్శన · వైద్య అంచనా కాదు",
+                )
+              : w.services[key]
+                ? l("Configured", "అమర్చబడింది")
+                : l("Not configured", "అమర్చలేదు")}
           </span>
         </div>
       ))}

@@ -32,6 +32,19 @@ dependencies, which is why `--include=dev` is included. Node is pinned by
 Do not copy the local `API_HOST`, `API_PORT` or `APP_ORIGINS` into Render. The server
 listens on `0.0.0.0` and automatically accepts its own Render HTTPS origin.
 
+`npm run build:render` automatically runs `npm test` through `prebuild:render`.
+A failing test stops deployment with the existing build command. GitHub Actions is
+optional. Use **Auto-Deploy → On Commit** with a connected GitHub account; a service
+connected only through a public repository URL needs manual deploys.
+
+Set `SCREENING_AI_MODE=mock` for the handbook demo. This is also the default if no
+research endpoint is set. `research` requires all three model settings; `disabled`
+allows an AI-failure rehearsal while clinicians continue reviewing cases.
+
+For the no-card video demo, set `VIDEO_PROVIDER=livekit`, `LIVEKIT_URL`,
+`LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` using a LiveKit Cloud Build project.
+See [integration setup](INTEGRATIONS.md). No separate video server runs on Render.
+
 7. Click **Create Web Service**. Wait for the build and health check to succeed,
    then open the exact HTTPS URL shown by Render.
 8. In Supabase **Authentication → URL Configuration**, set **Site URL** to that
@@ -54,8 +67,12 @@ always-on operation. It does not create a separate Render database.
 - Verify sign-in, assigned patient access, report upload/download and district
   aggregate access using the different accounts. Verify unauthorized access fails.
 - Test the app on Android over HTTPS, including camera and offline registration.
-- Keep video, AI and reminder delivery disabled until their providers are set up
-  and tested. See [INTEGRATIONS.md](INTEGRATIONS.md).
+- Use the labelled mock AI without external credentials. Configure and test the
+  video provider. Keep external reminders off until a delivery provider is available.
+
+Run `npm run test:deployed -- https://YOUR-SERVICE.onrender.com` after deployment.
+To check the deployed login page in Edge, set `DEPLOY_URL` to that HTTPS origin and
+run `npm run test:production`; this mode does not start a local server.
 
 If you add a custom domain, set `APP_ORIGINS` to its full HTTPS origin. The default
 Render origin remains accepted. Rebuild after changing the Supabase project URL or

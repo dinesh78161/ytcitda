@@ -1,5 +1,9 @@
 import type { Language, Role } from "./types";
 export const labels = {
+  duplicateWarning: [
+    "Possible existing record among your assigned patients. Check before registering another person:",
+    "మీకు కేటాయించిన రోగులలో ఇదే వ్యక్తి రికార్డు ఉండవచ్చు. కొత్త నమోదు ముందు తనిఖీ చేయండి:",
+  ],
   overview: ["Overview", "అవలోకనం"],
   patients: ["Patient registry", "రోగుల నమోదు"],
   screenings: ["Screening queue", "పరీక్షల జాబితా"],

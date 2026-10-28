@@ -8,7 +8,12 @@ import {
   supabase,
 } from "./client";
 import { demoProfiles, summarize, visibleDemo } from "./demo";
-import { careApi, serviceStatus, type ServiceStatus } from "./services";
+import {
+  careApi,
+  serviceStatus,
+  uploadRequestId,
+  type ServiceStatus,
+} from "./services";
 import {
   getLocal,
   listDrafts,
@@ -168,12 +173,14 @@ export function useWorkspace() {
             kind: "oral",
             data_url: payload.preview,
             ...payload,
+            request_id: await uploadRequestId(profile.id, "oral", payload),
           });
         else if (isCloud && action === "document")
           await careApi("upload", {
             kind: "report",
             data_url: payload.preview,
             ...payload,
+            request_id: await uploadRequestId(profile.id, "report", payload),
           });
         else if (isCloud && action === "analyze")
           await careApi("analyze", payload);

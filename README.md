@@ -3,6 +3,10 @@
 AAROHAN 2026 screening-to-care **synthetic demonstration**, built with React,
 TypeScript, Vite and Supabase PostgreSQL. Never enter real patient information.
 
+Deployed demonstration: https://aarogya-drishti-om9g.onrender.com/
+Start with the [handbook checklist](docs/HANDBOOK_CHECKLIST.md),
+[test report](docs/TEST_REPORT.md), and [submission guide](docs/SUBMISSION.md).
+
 ## Run locally
 
 Requires Node.js **24 or newer**.
@@ -47,7 +51,7 @@ server serves both the frontend and API; use `npm run build:render` and `npm sta
   decisions, closure checks and reopening with retained history.
 - Supabase Auth integration, RLS-protected reads and atomic workflow RPCs with
   patient authorization, revision checks, audit attribution and idempotency.
-- Configurable Node API for private validated files, Daily video rooms, reminder delivery
+- Configurable Node API for private validated files, LiveKit/Daily video, reminder delivery
   and a version-pinned research model endpoint. Credentials are server-only.
 
 ## Connect Supabase
@@ -65,7 +69,8 @@ For live files/video/model/reminders, also configure `.env.server` using
 `.env.server.example` and [integration setup](docs/INTEGRATIONS.md).
 Restart both servers after changing environment variables. Supabase mode uses actual login
 and never silently falls back to demo on failure. The implemented RPCs do not need
-a server secret in the browser. No hosted project has been created or modified.
+a server secret in the browser. Hosted checks use the separately configured Supabase
+project; they never install or rerun migrations automatically.
 
 ## Verify
 
@@ -83,27 +88,29 @@ an available Playwright browser in `playwright.config.ts`.
 Tests cover the full guided journey through closure and reopening, registration persistence,
 review/referral/booking/outcome, offline reload/retry, Telugu mobile layout, photo quality,
 appointment conflicts, optional procedures, database permissions and admin restrictions.
-These do not replace real Android or hosted Supabase validation.
+For deployed checks, use `npm run test:deployed -- https://YOUR-SERVICE.onrender.com`.
+With ignored `.env.server` configured, run `npm run test:hosted -- https://YOUR-SERVICE.onrender.com`
+to verify the existing synthetic demo accounts and record permissions.
+These do not replace real Android camera/installability checks or a two-device video call.
 
 Use the [demo runbook](docs/DEMO_RUNBOOK.md) to walk through the nine-step flow.
 
 ## Remaining work
 
-- **Hosted Supabase is not configured or verified.** Supply your project settings,
-  run the migrations, and test with separate user sessions.
-- **Live integrations need configuration and verification.** Private file endpoints,
-  Daily room/token creation and reminder delivery are implemented, but no hosted
-  accounts or credentials are supplied. See [integration setup](docs/INTEGRATIONS.md).
-- **No trained lesion detector is supplied.** Demo AI is a mock. Cloud analysis calls
-  a configured model, validates its version/output, and never falls back to mock.
+- **Two-device video needs provider credentials and a live call.** The recommended
+  no-card option is LiveKit Cloud's free Build plan. See [integration setup](docs/INTEGRATIONS.md).
+  External SMS is optional; in-app reminders and calendar downloads already work.
+- **No trained lesion detector is supplied or required for the mock demonstration.**
+  Hosted AI defaults to labelled `mock-v1` when no research endpoint is configured.
+  `SCREENING_AI_MODE=research` requires a version-pinned provider and never falls back to mock.
   Image quality remains an uncalibrated prototype. Research results require clinician review.
 - Offline storage contains synthetic records only and is not encrypted by this app.
   Supabase offline registration requires an existing session and waits for server
   acknowledgement on reconnect. Background sync across all Android browsers is not
   guaranteed. Historical cloud records are not cached for offline reading.
 - Staff assignment is administered through Supabase. A self-service administration UI,
-  MFA deployment, backup/restore drills and immediate revocation of already issued
-  provider tokens are outside this demonstration.
+  MFA enforcement, backup/restore rehearsal and immediate revocation of already issued
+  provider tokens remain pending. See [security and recovery](docs/SECURITY_AND_RECOVERY.md).
 
 See [implementation notes](docs/IMPLEMENTATION.md). AI-assisted work must be
 acknowledged for the hackathon; team members must understand and test the code.

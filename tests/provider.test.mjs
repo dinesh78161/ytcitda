@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServices } from "../server/index.mjs";
-function harness() {
+import { TokenVerifier } from "livekit-server-sdk";
+function harness(overrides = {}) {
   const person = crypto.randomUUID(),
     actor = crypto.randomUUID(),
     appointment = crypto.randomUUID(),
@@ -98,6 +99,7 @@ function harness() {
     SCREENING_MODEL_URL: "https://model.example.invalid/infer",
     SCREENING_MODEL_KEY: "model-test-key",
     SCREENING_MODEL_VERSION: "test-v1",
+    ...overrides,
   };
   const remote = async (url, options) => {
     const body = options.body ? JSON.parse(options.body) : null;
@@ -156,6 +158,94 @@ test("video handler verifies consent, creates a private room and scopes expiring
         w.value.actor_id === ctx.profile.id,
     ),
   );
+});
+test("hosted mock analysis is labelled, stored and never contacts a model provider", async () => {
+  const h = harness({ SCREENING_AI_MODE: "mock" });
+  assert.equal(h.services.status().ai_provider, "mock");
+  const result = await h.services.handle(
+    "/api/analyze",
+    { image_id: h.image },
+    h.ctx,
+  );
+  assert.equal(result.provider, "mock");
+  assert.equal(result.score, null);
+  assert.equal(result.clinical_use, false);
+  assert.equal(result.requires_clinician_review, true);
+  assert.equal(result.warning, "NOT FOR CLINICAL USE");
+  assert.equal(h.calls.length, 0);
+  assert.ok(
+    h.writes.some(
+      (w) => w.table === "ai_analyses" && w.value.provider === "mock",
+    ),
+  );
+  h.rows.images[0].quality_status = "recapture";
+  await assert.rejects(
+    () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+    (e) => e.status === 409,
+  );
+  h.rows.images[0].quality_status = "acceptable";
+  h.rows.consents[1].granted = false;
+  await assert.rejects(
+    () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+    (e) => e.status === 403,
+  );
+});
+test("LiveKit tokens are verified, appointment-scoped and grant no recording or administration", async () => {
+  const h = harness({
+    VIDEO_PROVIDER: "livekit",
+    LIVEKIT_URL: "wss://demo.livekit.cloud",
+    LIVEKIT_API_KEY: "test-key",
+    LIVEKIT_API_SECRET: "synthetic-test-secret-at-least-32-characters",
+  });
+  const result = await h.services.handle(
+    "/api/video",
+    { appointment_id: h.appointment },
+    h.ctx,
+  );
+  assert.equal(result.provider, "livekit");
+  assert.equal(result.server_url, "wss://demo.livekit.cloud");
+  const claims = await new TokenVerifier(
+    "test-key",
+    "synthetic-test-secret-at-least-32-characters",
+  ).verify(result.token);
+  assert.equal(claims.sub, h.ctx.profile.id);
+  assert.equal(claims.video.room, result.room_name);
+  assert.equal(claims.video.roomJoin, true);
+  assert.equal(claims.video.roomAdmin, false);
+  assert.equal(claims.video.roomRecord, false);
+  assert.equal(claims.video.canPublishData, false);
+  assert.deepEqual(claims.video.canPublishSources, ["camera", "microphone"]);
+  assert.ok(Math.abs(claims.exp - result.expires_at) <= 1);
+  assert.equal(h.calls.length, 0);
+  assert.ok(!JSON.stringify(claims).includes(h.person));
+  h.rows.consents[0].granted = false;
+  await assert.rejects(
+    () =>
+      h.services.handle("/api/video", { appointment_id: h.appointment }, h.ctx),
+    (e) => e.status === 403,
+  );
+  h.rows.consents[0].granted = true;
+  h.ctx.profile.role = "navigator";
+  await assert.rejects(
+    () =>
+      h.services.handle("/api/video", { appointment_id: h.appointment }, h.ctx),
+    (e) => e.status === 403,
+  );
+});
+test("disabled or missing research configuration never silently falls back to mock", async () => {
+  for (const config of [
+    { SCREENING_AI_MODE: "disabled" },
+    { SCREENING_AI_MODE: "research", SCREENING_MODEL_KEY: "" },
+  ]) {
+    const h = harness(config);
+    assert.equal(h.services.status().ai, false);
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === 503,
+    );
+    assert.equal(h.writes.length, 0);
+    assert.equal(h.calls.length, 0);
+  }
 });
 test("unassigned and withdrawn-consent calls fail before contacting any provider", async () => {
   const h = harness();

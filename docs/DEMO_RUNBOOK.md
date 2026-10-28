@@ -38,8 +38,9 @@ device separately. The automated mobile checks use a 390 px browser viewport.
 ## Integration acceptance
 
 Apply all five migrations from [Supabase setup](SUPABASE_SETUP.md). Follow
-[integration setup](INTEGRATIONS.md) to configure private storage, Daily video,
-the version-pinned research endpoint and optional reminder delivery. Keep service
+[integration setup](INTEGRATIONS.md) to configure private storage and LiveKit video.
+The hosted mock adapter requires no external model; a version-pinned research endpoint
+and external reminder delivery are optional. Keep service
 keys in `.env.server`; browser configuration contains only the publishable key.
 Unconfigured services display unavailable states and cannot report live success.
 Verify separate assigned/unassigned accounts, two-device calls, private report access,
@@ -54,5 +55,5 @@ offline registration, photo quality, report downloads, treatments, reminders,
 Telugu and mobile layouts. Screenshots and failure traces are under `test-results/`.
 
 The demo uses synthetic records only. The application includes no trained lesion
-model, and the quality heuristics are not clinically calibrated. Hosted services
-and clinical validation require separate setup and verification.
+model, and the quality heuristics are not clinically calibrated. See the
+[test report](TEST_REPORT.md) for executed hosted checks and pending acceptance steps.

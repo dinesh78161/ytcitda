@@ -3,6 +3,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { createStaticHandler } from "./static.mjs";
+import { storePrivateUpload } from "./private-upload.mjs";
+import { AccessToken, TrackSource } from "livekit-server-sdk";
 import {
   HttpError,
   requireValue,
@@ -33,17 +35,42 @@ export function createServices(
         auth: { persistSession: false, autoRefreshToken: false },
       })
     : null;
+  const aiMode =
+    env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
+  requireValue(
+    ["mock", "research", "disabled"].includes(aiMode),
+    503,
+    "SCREENING_AI_MODE must be mock, research or disabled.",
+  );
+  const aiEnabled =
+    configured &&
+    (aiMode === "mock" ||
+      (aiMode === "research" &&
+        !!(
+          env.SCREENING_MODEL_URL &&
+          env.SCREENING_MODEL_KEY &&
+          env.SCREENING_MODEL_VERSION
+        )));
+  const videoProvider =
+    env.VIDEO_PROVIDER ||
+    (env.LIVEKIT_URL ? "livekit" : env.DAILY_API_KEY ? "daily" : "disabled");
+  requireValue(
+    ["livekit", "daily", "disabled"].includes(videoProvider),
+    503,
+    "VIDEO_PROVIDER must be livekit, daily or disabled.",
+  );
+  const videoEnabled =
+    configured &&
+    (videoProvider === "livekit"
+      ? !!(env.LIVEKIT_URL && env.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET)
+      : videoProvider === "daily" && !!env.DAILY_API_KEY);
   const status = () => ({
     database: configured,
     files: configured,
-    video: configured && !!env.DAILY_API_KEY,
-    ai:
-      configured &&
-      !!(
-        env.SCREENING_MODEL_URL &&
-        env.SCREENING_MODEL_KEY &&
-        env.SCREENING_MODEL_VERSION
-      ),
+    video: videoEnabled,
+    video_provider: videoEnabled ? videoProvider : "disabled",
+    ai: aiEnabled,
+    ai_provider: aiEnabled ? aiMode : "disabled",
     reminders:
       configured &&
       env.REMINDER_DELIVERY_ENABLED === "true" &&
@@ -148,44 +175,44 @@ export function createServices(
       );
       await patient(ctx, body.patient_id);
       await consent(ctx, body.patient_id, oral ? "image_capture" : "screening");
-      const file = await validateFile(body.data_url, body.kind),
-        id = randomUUID();
-      const key = `${body.patient_id}/${id}.${file.mime_type === "image/jpeg" ? "jpg" : "pdf"}`,
-        bucket = oral ? "oral-images" : "pathology-reports";
-      checked(
-        await admin.storage.from(bucket).upload(key, file.bytes, {
-          contentType: file.mime_type,
-          upsert: false,
-        }),
+      requireValue(
+        body.request_id === undefined || uuid(body.request_id),
+        400,
+        "Invalid upload request ID.",
       );
-      try {
-        const metadata = {
-          id,
-          patient_id: body.patient_id,
-          object_key: key,
-          sha256: file.sha256,
-          mime_type: file.mime_type,
-          size_bytes: file.bytes.length,
-          name: String(body.name || "Report")
-            .replace(/[\r\n\\/]/g, "_")
-            .slice(0, 150),
-          investigation_id: body.investigation_id || null,
-          oral_view: body.oral_view || "cheek",
-          quality_status: file.quality_status,
-          quality_details: file.quality_details,
-        };
-        checked(
-          await admin.rpc("record_private_file", {
-            actor_id: ctx.profile.id,
-            kind: body.kind,
-            metadata,
-          }),
+      if (oral)
+        requireValue(
+          ["cheek", "tongue", "palate", "gums", "floor_of_mouth"].includes(
+            body.oral_view || "cheek",
+          ),
+          400,
+          "Invalid oral view.",
         );
-      } catch (error) {
-        await admin.storage.from(bucket).remove([key]);
-        throw error;
-      }
-      return { id, quality_status: file.quality_status };
+      const file = await validateFile(body.data_url, body.kind),
+        id = body.request_id || randomUUID();
+      const key = `${body.patient_id}/${id}.${file.mime_type === "image/jpeg" ? "jpg" : "pdf"}`;
+      const metadata = {
+        id,
+        patient_id: body.patient_id,
+        object_key: key,
+        sha256: file.sha256,
+        mime_type: file.mime_type,
+        size_bytes: file.bytes.length,
+        name: String(body.name || "Report")
+          .replace(/[\r\n\\/]/g, "_")
+          .slice(0, 150),
+        investigation_id: body.investigation_id || null,
+        oral_view: body.oral_view || "cheek",
+        quality_status: file.quality_status,
+        quality_details: file.quality_details,
+      };
+      return storePrivateUpload(
+        admin,
+        body.kind,
+        metadata,
+        file.bytes,
+        ctx.profile.id,
+      );
     }
     if (path === "/api/download") {
       const oral = body.kind === "oral";
@@ -239,6 +266,45 @@ export function createServices(
           .update(a.id + a.starts_at)
           .digest("hex")
           .slice(0, 32);
+      if (videoProvider === "livekit") {
+        const server = new URL(env.LIVEKIT_URL);
+        requireValue(
+          server.protocol === "wss:" && !server.username && !server.password,
+          503,
+          "Configure a secure LiveKit wss:// project URL.",
+        );
+        const token = new AccessToken(
+          env.LIVEKIT_API_KEY,
+          env.LIVEKIT_API_SECRET,
+          {
+            identity: ctx.profile.id,
+            name: `Synthetic ${ctx.profile.role.replaceAll("_", " ")}`,
+            ttl: Math.max(1, exp - Math.floor(Date.now() / 1000)),
+          },
+        );
+        token.addGrant({
+          roomJoin: true,
+          room: roomName,
+          canPublish: true,
+          canPublishSources: [TrackSource.CAMERA, TrackSource.MICROPHONE],
+          canSubscribe: true,
+          canPublishData: false,
+          canUpdateOwnMetadata: false,
+          roomAdmin: false,
+          roomRecord: false,
+          roomList: false,
+          roomCreate: false,
+        });
+        const jwt = await token.toJwt();
+        await audit(ctx, "JOIN_VIDEO", "appointments", a.id);
+        return {
+          provider: "livekit",
+          server_url: server.origin,
+          token: jwt,
+          room_name: roomName,
+          expires_at: exp,
+        };
+      }
       let room = await remote(
         `https://api.daily.co/v1/rooms/${roomName}`,
         env.DAILY_API_KEY,
@@ -305,6 +371,7 @@ export function createServices(
       );
       await audit(ctx, "JOIN_VIDEO", "appointments", a.id);
       return {
+        provider: "daily",
         url: `${room.url}?t=${encodeURIComponent(token.token)}`,
         expires_at: exp,
       };
@@ -313,7 +380,7 @@ export function createServices(
       requireValue(
         status().ai,
         503,
-        "A trained screening model endpoint and version must be configured.",
+        "Image analysis is disabled or its research provider is not configured. Clinician review remains available.",
       );
       role(ctx, ["health_worker", "medical_officer", "specialist"]);
       requireValue(uuid(body.image_id), 400, "Invalid image ID.");
@@ -330,21 +397,35 @@ export function createServices(
         409,
         "Retake this image before analysis.",
       );
-      const blob = checked(
-        await admin.storage.from("oral-images").download(image.object_key),
-      );
-      const raw = await remote(
-        env.SCREENING_MODEL_URL,
-        env.SCREENING_MODEL_KEY,
-        {
-          image_base64: Buffer.from(await blob.arrayBuffer()).toString(
-            "base64",
-          ),
-          mime_type: "image/jpeg",
-          model_version: env.SCREENING_MODEL_VERSION,
-        },
-      );
-      const result = validateModelResult(raw, env.SCREENING_MODEL_VERSION);
+      let result;
+      if (aiMode === "mock") {
+        result = {
+          provider: "mock",
+          model_version: "mock-v1",
+          research_label: "demo_review_required",
+          score: null,
+          status: "completed",
+          clinical_use: false,
+          requires_clinician_review: true,
+          warning: "NOT FOR CLINICAL USE",
+        };
+      } else {
+        const blob = checked(
+          await admin.storage.from("oral-images").download(image.object_key),
+        );
+        const raw = await remote(
+          env.SCREENING_MODEL_URL,
+          env.SCREENING_MODEL_KEY,
+          {
+            image_base64: Buffer.from(await blob.arrayBuffer()).toString(
+              "base64",
+            ),
+            mime_type: "image/jpeg",
+            model_version: env.SCREENING_MODEL_VERSION,
+          },
+        );
+        result = validateModelResult(raw, env.SCREENING_MODEL_VERSION);
+      }
       await consent(ctx, image.patient_id, "image_capture");
       const saved = checked(
         await admin
@@ -353,7 +434,12 @@ export function createServices(
           .select("id")
           .single(),
       );
-      await audit(ctx, "RESEARCH_ANALYSIS", "ai_analyses", saved.id);
+      await audit(
+        ctx,
+        aiMode === "mock" ? "MOCK_ANALYSIS" : "RESEARCH_ANALYSIS",
+        "ai_analyses",
+        saved.id,
+      );
       return { id: saved.id, ...result };
     }
     throw new HttpError(404, "Endpoint not found.");
