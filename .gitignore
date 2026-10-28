@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+!.env.server.example
+node_modules/
+.supabase/
+supabase/.temp/
+supabase/.branches/
+coverage/
+*.log
+dist/
+test-results/
+playwright-report/

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: aarogya-drishti
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build:render
+    startCommand: npm start
+    healthCheckPath: /api/status
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: REMINDER_DELIVERY_ENABLED
+        value: "false"

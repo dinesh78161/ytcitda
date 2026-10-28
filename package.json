@@ -1,0 +1,47 @@
+{
+  "name": "aarogya-drishti",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "node --env-file-if-exists=.env.server server/index.mjs",
+    "dev:all": "node scripts/dev.mjs",
+    "db:check": "node --env-file-if-exists=.env.server scripts/check-db.mjs",
+    "db:prepare": "node scripts/prepare-db.mjs",
+    "build": "tsc --noEmit && vite build",
+    "build:render": "node --env-file-if-exists=.env.server scripts/build-render.mjs",
+    "start": "node --env-file-if-exists=.env.server server/start.mjs",
+    "preview": "vite preview",
+    "test": "node tests/database.test.mjs && node tests/workflow.test.mjs && node tests/care.test.mjs && node tests/journey.test.mjs && node tests/services.test.mjs && node tests/provider.test.mjs && node tests/production.test.mjs",
+    "test:e2e": "playwright test",
+    "test:production": "playwright test --config playwright.production.config.ts",
+    "format": "prettier --write src tests server scripts *.ts *.json docs README.md"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@playwright/test": "1.64.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vite-plugin-pwa": "2.0.0"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "5.3.0",
+    "@fontsource-variable/manrope": "5.3.0",
+    "@fontsource/noto-sans-telugu": "5.3.0",
+    "@supabase/supabase-js": "2.118.0",
+    "idb": "8.0.4",
+    "jpeg-js": "0.4.4",
+    "lucide-react": "1.61.0",
+    "pdf-lib": "1.17.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

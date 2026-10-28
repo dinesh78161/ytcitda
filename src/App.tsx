@@ -1,0 +1,2234 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  Camera,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  ClipboardCheck,
+  Cloud,
+  CloudOff,
+  Database,
+  Eye,
+  FileText,
+  HeartHandshake,
+  LayoutDashboard,
+  LoaderCircle,
+  LogOut,
+  MapPin,
+  Menu,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  UsersRound,
+  Video,
+  Wifi,
+  X,
+} from "lucide-react";
+import { configurationError, isCloud, supabase } from "./lib/client";
+import { demoProfiles } from "./lib/demo";
+import { inspectImage } from "./lib/image-quality";
+import { roleLabel, statusLabel, translator, type Label } from "./lib/i18n";
+import { message, useWorkspace } from "./lib/use-workspace";
+import type { Language, Page, Patient, Role } from "./lib/types";
+import {
+  AppointmentTools,
+  ConsentPanel,
+  IntegrationStatus,
+  OutreachPanel,
+  PatientCare,
+  RemindersPanel,
+} from "./CarePanels";
+import { hasConsent } from "./lib/care-workflows";
+import { careApi, downloadUrl } from "./lib/services";
+import { latestScreening, stages } from "./lib/journey";
+import {
+  GuidedJourney,
+  CaseDecisions,
+  PatientAppointments,
+  JourneyMetrics,
+} from "./PatientJourney";
+
+type Workspace = ReturnType<typeof useWorkspace>;
+const Context = createContext<{
+  w: Workspace;
+  lang: Language;
+  t: ReturnType<typeof translator>;
+  notify: (text: string, error?: boolean) => void;
+  run: (fn: () => Promise<unknown>, success?: string) => Promise<boolean>;
+}>(null!);
+export const useApp = () => useContext(Context);
+const navItems: { id: Page; icon: typeof Activity }[] = [
+  { id: "overview", icon: LayoutDashboard },
+  { id: "patients", icon: UsersRound },
+  { id: "screenings", icon: ClipboardCheck },
+  { id: "appointments", icon: CalendarDays },
+  { id: "followups", icon: HeartHandshake },
+  { id: "reports", icon: Activity },
+];
+const dateLabel = (value: string, lang: Language, withTime = false) =>
+  new Intl.DateTimeFormat(lang === "te" ? "te-IN" : "en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(withTime
+      ? { hour: "numeric" as const, minute: "2-digit" as const }
+      : {}),
+    timeZone: "Asia/Kolkata",
+  }).format(new Date(value));
+const shortId = (id: string) => `AD-${id.slice(-6).toUpperCase()}`;
+const clinician = (role?: Role) =>
+  role === "medical_officer" || role === "specialist";
+
+export default function App() {
+  const w = useWorkspace(),
+    [lang, setLang] = useState<Language>(() =>
+      localStorage.getItem("aarogya-language") === "te" ? "te" : "en",
+    );
+  const [page, setPage] = useState<Page>("overview"),
+    [search, setSearch] = useState(""),
+    [selected, setSelected] = useState<string | null>(null),
+    [registration, setRegistration] = useState(false),
+    [mobileNav, setMobileNav] = useState(false),
+    [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+  const t = translator(lang);
+  const notify = (text: string, error = false) => setToast({ text, error });
+  const run = async (
+    fn: () => Promise<unknown>,
+    success: string = t("saved"),
+  ) => {
+    try {
+      await fn();
+      notify(success);
+      return true;
+    } catch (e) {
+      notify(message(e), true);
+      return false;
+    }
+  };
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    localStorage.setItem("aarogya-language", lang);
+  }, [lang]);
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 6500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+  useEffect(() => {
+    setSelected(null);
+    setPage("overview");
+    setSearch("");
+  }, [w.profile?.id]);
+  const navigate = (next: Page) => {
+    setSelected(null);
+    setPage(next);
+    setMobileNav(false);
+  };
+  const allowedNav =
+    w.profile?.role === "district_admin"
+      ? navItems.filter((n) => ["overview", "reports"].includes(n.id))
+      : w.profile?.role === "navigator"
+        ? navItems.filter((n) => n.id !== "screenings")
+        : navItems;
+  const patient = w.data.patients.find((p) => p.id === selected);
+  return (
+    <Context.Provider value={{ w, lang, t, notify, run }}>
+      {!w.profile ? (
+        <Login lang={lang} setLang={setLang} />
+      ) : (
+        <div className="app-shell">
+          {mobileNav && (
+            <button
+              className="nav-scrim"
+              aria-label={t("close")}
+              onClick={() => setMobileNav(false)}
+            />
+          )}
+          <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
+            <a
+              className="brand"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate("overview");
+              }}
+            >
+              <img src="/icon.svg" alt="" />
+              <span>
+                Aarogya
+                <span className="brand-second">
+                  Drishti<span className="brand-dot">.</span>
+                </span>
+              </span>
+            </a>
+            <div className="sidebar-rule" />
+            <div className="nav-label">{t("workspace")}</div>
+            <nav aria-label={t("workspace")}>
+              {allowedNav.map(({ id, icon: Icon }) => (
+                <button
+                  key={id}
+                  className={`nav-item ${page === id && !selected ? "active" : ""}`}
+                  onClick={() => navigate(id)}
+                >
+                  <Icon size={19} />
+                  <span>{t(id)}</span>
+                  {id === "screenings" &&
+                    w.data.screenings.filter(
+                      (s) => s.status === "awaiting_clinician",
+                    ).length > 0 && (
+                      <span className="nav-count">
+                        {
+                          w.data.screenings.filter(
+                            (s) => s.status === "awaiting_clinician",
+                          ).length
+                        }
+                      </span>
+                    )}
+                </button>
+              ))}
+            </nav>
+            <div className="sidebar-bottom">
+              <div className="programme-card">
+                <span className="small-sun">✳</span>
+                <span>
+                  AAROHAN <b>2026</b>
+                </span>
+                <p>{t("tagline")}</p>
+                <span className="programme-location">
+                  <MapPin size={13} /> ITDA Paderu · ASR District
+                </span>
+              </div>
+              <button
+                className={`nav-item ${page === "settings" ? "active" : ""}`}
+                onClick={() => navigate("settings")}
+              >
+                <Settings2 size={19} />
+                {t("settings")}
+              </button>
+              <div className="sidebar-foot">
+                <ShieldCheck size={15} />
+                {t("synthetic")}
+              </div>
+            </div>
+          </aside>
+          <div className="workspace">
+            <header className="topbar">
+              <div className="topbar-left">
+                <button
+                  className="icon-button mobile-menu"
+                  aria-label={t("menu")}
+                  onClick={() => setMobileNav(true)}
+                >
+                  <Menu size={22} />
+                </button>
+                <span className="breadcrumb">
+                  {t("workspace")}
+                  <ChevronRight size={14} />
+                  <strong>{selected ? t("patientRecord") : t(page)}</strong>
+                </span>
+              </div>
+              <div className="topbar-right">
+                <span
+                  className={`connection-pill ${!w.online ? "offline" : ""}`}
+                >
+                  {w.online ? (
+                    <span className="status-dot" />
+                  ) : (
+                    <CloudOff size={13} />
+                  )}
+                  <span>{w.online ? t("online") : t("offline")}</span>
+                </span>
+                <div className="language-switch" aria-label={t("language")}>
+                  <button
+                    className={lang === "en" ? "selected" : ""}
+                    onClick={() => setLang("en")}
+                  >
+                    EN
+                  </button>
+                  <button
+                    className={lang === "te" ? "selected" : ""}
+                    onClick={() => setLang("te")}
+                  >
+                    తెలుగు
+                  </button>
+                </div>
+                <div className="header-divider" />
+                <button
+                  className="user-button"
+                  onClick={() => navigate("settings")}
+                  aria-label={t("settings")}
+                >
+                  <span className="avatar">
+                    {w.profile.role === "health_worker"
+                      ? "HW"
+                      : w.profile.role === "medical_officer"
+                        ? "MO"
+                        : w.profile.role === "district_admin"
+                          ? "DA"
+                          : w.profile.role === "navigator"
+                            ? "CN"
+                            : "SP"}
+                  </span>
+                  <span className="user-copy">
+                    <strong>{roleLabel(w.profile.role, lang)}</strong>
+                    <small>{isCloud ? t("cloud") : t("demo")}</small>
+                  </span>
+                </button>
+              </div>
+            </header>
+            <main id="main-content">
+              <div className="demo-notice">
+                <span>
+                  <span className="notice-dot" />
+                  {isCloud ? t("nonclinical") : t("demoNote")}
+                </span>
+                {!isCloud && (
+                  <select
+                    aria-label={t("demoRole")}
+                    value={w.profile.role}
+                    disabled={w.busy}
+                    onChange={(e) =>
+                      void run(
+                        () => w.changeRole(e.target.value as Role),
+                        roleLabel(e.target.value as Role, lang),
+                      )
+                    }
+                  >
+                    {demoProfiles.map((p) => (
+                      <option key={p.role} value={p.role}>
+                        {roleLabel(p.role, lang)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {w.error && (
+                <div className="error-box" role="alert">
+                  {w.error}
+                  <button
+                    className="text-button"
+                    onClick={() => void run(w.refresh)}
+                  >
+                    {t("retry")}
+                  </button>
+                </div>
+              )}
+              {w.drafts.length > 0 && (
+                <button
+                  className="queue-banner"
+                  onClick={() => navigate("settings")}
+                >
+                  <CloudOff size={18} />
+                  {w.drafts.length} · {t("drafts")}
+                  <ArrowRight size={16} />
+                </button>
+              )}
+              {w.loading ? (
+                <div className="loading">
+                  <LoaderCircle className="spin" />
+                  {t("loading")}
+                </div>
+              ) : patient ? (
+                <PatientDetail
+                  patient={patient}
+                  back={() => setSelected(null)}
+                  onReports={() => navigate("reports")}
+                />
+              ) : page === "overview" ? (
+                <Overview
+                  openPatient={setSelected}
+                  navigate={navigate}
+                  register={() => setRegistration(true)}
+                />
+              ) : page === "patients" || page === "screenings" ? (
+                <>
+                  <PageHeading
+                    title={t(page)}
+                    subtitle={
+                      page === "patients" ? t("intro") : t("reviewHint")
+                    }
+                    action={
+                      w.profile.role === "health_worker" ? (
+                        <button
+                          className="button primary"
+                          onClick={() => setRegistration(true)}
+                        >
+                          <Plus size={18} />
+                          {t("newPatient")}
+                        </button>
+                      ) : null
+                    }
+                  />
+                  <PatientTable
+                    search={search}
+                    setSearch={setSearch}
+                    screeningOnly={page === "screenings"}
+                    onOpen={setSelected}
+                  />
+                </>
+              ) : page === "appointments" ? (
+                <Appointments openPatient={setSelected} />
+              ) : page === "followups" ? (
+                <FollowUps openPatient={setSelected} />
+              ) : page === "reports" ? (
+                <Reports />
+              ) : (
+                <WorkspaceSettings />
+              )}
+              <footer className="page-footer">
+                <span>
+                  © 2026 Aarogya Drishti <span>·</span> AAROHAN
+                </span>
+                <span>
+                  <ShieldCheck size={13} />
+                  {t("nonclinical")}
+                </span>
+              </footer>
+            </main>
+          </div>
+        </div>
+      )}
+      {registration && <Registration onClose={() => setRegistration(false)} />}
+      {toast && (
+        <div
+          className={`toast ${toast.error ? "toast-error" : ""}`}
+          role={toast.error ? "alert" : "status"}
+        >
+          {toast.error ? <CircleHelp size={20} /> : <CheckCircle2 size={20} />}
+          <span>{toast.text}</span>
+          <button
+            className="icon-button"
+            aria-label={t("close")}
+            onClick={() => setToast(null)}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+    </Context.Provider>
+  );
+}
+
+function PageHeading({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      <div>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+export function Badge({ status }: { status: string }) {
+  const { lang } = useApp();
+  return (
+    <span className={`badge badge-${status}`}>
+      <span />
+      {statusLabel(status, lang)}
+    </span>
+  );
+}
+function Empty({ text }: { text?: string }) {
+  const { t } = useApp();
+  return (
+    <div className="empty">
+      <ClipboardCheck size={30} />
+      <strong>{text ?? t("noRecords")}</strong>
+    </div>
+  );
+}
+
+function Overview({
+  openPatient,
+  navigate,
+  register,
+}: {
+  openPatient: (id: string) => void;
+  navigate: (page: Page) => void;
+  register: () => void;
+}) {
+  const { w, t } = useApp(),
+    admin = w.profile?.role === "district_admin";
+  const waiting = w.data.screenings.filter(
+    (s) => s.status === "awaiting_clinician" || s.status === "screened",
+  ).length;
+  const metrics = [
+    {
+      label: t("total"),
+      value: w.summary.patients,
+      icon: UsersRound,
+      help: t("recorded"),
+      color: "green",
+    },
+    {
+      label: admin ? t("screening") : t("waiting"),
+      value: admin ? w.summary.screenings : waiting,
+      icon: ClipboardCheck,
+      help: t("reviewHint"),
+      color: "orange",
+    },
+    {
+      label: t("referrals"),
+      value: w.summary.referrals,
+      icon: Stethoscope,
+      help: t("referralHint"),
+      color: "blue",
+    },
+    {
+      label: t("pending"),
+      value: w.summary.pending_follow_ups,
+      icon: HeartHandshake,
+      help: t("followupHint"),
+      color: "purple",
+    },
+  ];
+  return (
+    <>
+      <PageHeading
+        title={t("hello")}
+        subtitle={t("intro")}
+        action={
+          w.profile?.role === "health_worker" ? (
+            <button className="button primary" onClick={register}>
+              <Plus size={18} />
+              {t("newPatient")}
+            </button>
+          ) : (
+            <button
+              className="button secondary"
+              onClick={() =>
+                navigate(
+                  admin
+                    ? "reports"
+                    : w.profile?.role === "navigator"
+                      ? "followups"
+                      : "screenings",
+                )
+              }
+            >
+              <ArrowUpRight size={18} />
+              {t(
+                admin
+                  ? "reports"
+                  : w.profile?.role === "navigator"
+                    ? "followups"
+                    : "screenings",
+              )}
+            </button>
+          )
+        }
+      />
+      <section className="hero">
+        <div className="hero-copy">
+          <div className="eyebrow">
+            <span />
+            {t("programme")}
+          </div>
+          <h2>{t("journey")}</h2>
+          <p>{t("journeyText")}</p>
+          <div className="journey-steps">
+            {(
+              [
+                "registration",
+                "screening",
+                "review",
+                "referral",
+                "care",
+              ] as Label[]
+            ).map((key, i) => (
+              <span key={key}>
+                <b>{i + 1}</b>
+                {t(key)}
+                {i < 4 && <ChevronRight size={13} />}
+              </span>
+            ))}
+          </div>
+        </div>
+        <Landscape />
+      </section>
+      <section className="metric-grid" aria-label={t("overview")}>
+        {metrics.map((m) => (
+          <article className="metric-card" key={m.label}>
+            <div className="metric-top">
+              <span>{m.label}</span>
+              <span className={`metric-icon ${m.color}`}>
+                <m.icon size={19} />
+              </span>
+            </div>
+            <strong>{String(m.value).padStart(2, "0")}</strong>
+            <span className="metric-help">{m.help}</span>
+          </article>
+        ))}
+      </section>
+      <div className="overview-grid">
+        <section className="panel recent-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>{admin ? t("reports") : t("recent")}</h2>
+              <p>{admin ? t("reportsText") : t("protected")}</p>
+            </div>
+            {!admin && (
+              <button
+                className="text-button"
+                onClick={() => navigate("patients")}
+              >
+                {t("viewAll")}
+                <ArrowRight size={15} />
+              </button>
+            )}
+          </div>
+          {admin ? (
+            <AggregateChart />
+          ) : (
+            <PatientTable onOpen={openPatient} compact />
+          )}
+        </section>
+        <div className="right-rail">
+          <section className="panel attention-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>{t("attention")}</h2>
+                <p>{t("attentionText")}</p>
+              </div>
+              <span className="attention-dot" />
+            </div>
+            {[
+              {
+                label: t("reviewQueue"),
+                value: waiting,
+                icon: ClipboardCheck,
+                page: "screenings" as Page,
+                color: "orange",
+              },
+              {
+                label: t("missed"),
+                value: w.summary.missed_appointments,
+                icon: CalendarDays,
+                page: "appointments" as Page,
+                color: "pink",
+              },
+              {
+                label: t("openTasks"),
+                value: w.summary.pending_follow_ups,
+                icon: HeartHandshake,
+                page: "followups" as Page,
+                color: "green",
+              },
+            ]
+              .filter(
+                (x) =>
+                  !admin &&
+                  !(w.profile?.role === "navigator" && x.page === "screenings"),
+              )
+              .map((item) => (
+                <button
+                  className="attention-item"
+                  key={item.page}
+                  onClick={() => navigate(item.page)}
+                >
+                  <span className={`metric-icon ${item.color}`}>
+                    <item.icon size={18} />
+                  </span>
+                  <span>{item.label}</span>
+                  <b>{item.value}</b>
+                  <ChevronRight size={15} />
+                </button>
+              ))}
+            {admin && (
+              <button
+                className="attention-item"
+                onClick={() => navigate("reports")}
+              >
+                <Activity size={22} />
+                <span>{t("reports")}</span>
+                <ArrowRight size={18} />
+              </button>
+            )}
+          </section>
+          <section className="quick-card">
+            <div className="quick-icon">
+              <HeartHandshake size={23} />
+            </div>
+            <h3>
+              {t(w.profile?.role === "health_worker" ? "quick" : "journey")}
+            </h3>
+            <p>
+              {t(
+                w.profile?.role === "health_worker"
+                  ? "quickText"
+                  : "journeyText",
+              )}
+            </p>
+            <button
+              className="text-button"
+              onClick={
+                w.profile?.role === "health_worker"
+                  ? register
+                  : () => navigate(admin ? "reports" : "followups")
+              }
+            >
+              {t(
+                w.profile?.role === "health_worker"
+                  ? "newPatient"
+                  : admin
+                    ? "reports"
+                    : "followups",
+              )}
+              <ArrowRight size={16} />
+            </button>
+          </section>
+        </div>
+      </div>
+    </>
+  );
+}
+function Landscape() {
+  return (
+    <svg className="landscape" viewBox="0 0 360 210" aria-hidden="true">
+      <circle cx="272" cy="49" r="29" fill="#eac486" />
+      <circle
+        cx="272"
+        cy="49"
+        r="39"
+        fill="none"
+        stroke="#eac486"
+        opacity=".15"
+      />
+      <path d="M0 153 100 43l101 110 60-77 99 91v43H0Z" fill="#3f7461" />
+      <path d="m61 86 39-43 43 47-41-13Z" fill="#88a892" />
+      <path d="m0 182 119-75 131 75 110-50v78H0Z" fill="#669378" />
+      <path d="M0 197q91-41 172-13t188-8v34H0Z" fill="#91af8b" />
+      <path
+        d="M169 210q-44-36 2-48"
+        fill="none"
+        stroke="#cfd1aa"
+        strokeWidth="12"
+      />
+      <g transform="translate(232 125)">
+        <path d="M-22 12 15-14 52 12Z" fill="#d6a771" />
+        <path d="M-14 12h58v35h-58z" fill="#ead9b2" />
+        <path d="M9 24h14v23H9Z" fill="#537d64" />
+        <path d="M-8 21h10v10H-8zM29 21h10v10H29Z" fill="#719378" />
+      </g>
+      <g fill="#224f42">
+        <path d="M66 172h5v-41h-5z" />
+        <circle cx="68" cy="121" r="20" />
+        <circle cx="55" cy="131" r="16" />
+        <circle cx="80" cy="132" r="17" />
+        <path d="M320 181h4v-31h-4z" />
+        <circle cx="322" cy="142" r="17" />
+      </g>
+      <path
+        d="m33 41 5-3 5 3m-1-13 5-3 5 3"
+        stroke="#92b49a"
+        fill="none"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+function PatientTable({
+  onOpen,
+  compact = false,
+  search = "",
+  setSearch,
+  screeningOnly = false,
+}: {
+  onOpen: (id: string) => void;
+  compact?: boolean;
+  search?: string;
+  setSearch?: (s: string) => void;
+  screeningOnly?: boolean;
+}) {
+  const { w, t, lang } = useApp(),
+    [filter, setFilter] = useState("all"),
+    [limit, setLimit] = useState(10);
+  const rows = [...w.data.patients]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .filter((p) => {
+      const s = latestScreening(w.data, p.id);
+      const matches = `${p.display_name} ${p.village} ${shortId(p.id)}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+      return (
+        matches &&
+        (!screeningOnly ||
+          s?.status === "awaiting_clinician" ||
+          s?.status === "screened") &&
+        (filter === "all" || s?.status === filter)
+      );
+    });
+  return (
+    <div className={compact ? "" : "panel registry-panel"}>
+      {!compact && (
+        <div className="table-toolbar">
+          <label className="search-field">
+            <Search size={18} />
+            <input
+              aria-label={t("search")}
+              value={search}
+              onChange={(e) => setSearch?.(e.target.value)}
+              placeholder={t("search")}
+            />
+          </label>
+          <select
+            aria-label={t("stage")}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          >
+            <option value="all">{t("all")}</option>
+            {stages.map((s) => (
+              <option key={s} value={s}>
+                {statusLabel(s, lang)}
+              </option>
+            ))}
+          </select>
+          <span className="record-count">
+            {rows.length} {t("patients").toLowerCase()}
+          </span>
+        </div>
+      )}
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("patient")}</th>
+              <th>{t("village")}</th>
+              <th>{t("stage")}</th>
+              {!compact && <th>{t("registered")}</th>}
+              <th>
+                <span className="sr-only">{t("open")}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, compact ? 5 : limit).map((p, i) => {
+              const s = latestScreening(w.data, p.id);
+              return (
+                <tr key={p.id}>
+                  <td>
+                    <button
+                      className="patient-link"
+                      onClick={() => onOpen(p.id)}
+                    >
+                      <span className={`patient-avatar avatar-${i % 4}`}>
+                        {p.display_name
+                          .split(" ")
+                          .map((x) => x[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                      <span>
+                        <strong>{p.display_name}</strong>
+                        <small>
+                          {shortId(p.id)} <span>·</span> {p.age_years}{" "}
+                          {t("years")}
+                        </small>
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <span className="village-cell">
+                      <MapPin size={13} />
+                      {p.village}
+                    </span>
+                  </td>
+                  <td>
+                    {s ? (
+                      <Badge status={s.status} />
+                    ) : (
+                      <span className="muted">{t("protected")}</span>
+                    )}
+                  </td>
+                  {!compact && (
+                    <td className="muted">{dateLabel(p.created_at, lang)}</td>
+                  )}
+                  <td>
+                    <button
+                      className="icon-button"
+                      aria-label={`${t("open")}: ${p.display_name}`}
+                      onClick={() => onOpen(p.id)}
+                    >
+                      <ArrowUpRight size={18} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length === 0 && (
+        <Empty text={search ? t("noResults") : t("noRecords")} />
+      )}{" "}
+      {!compact && rows.length > limit && (
+        <button
+          className="button load-more"
+          onClick={() => setLimit((n) => n + 10)}
+        >
+          {t("viewAll")} ({rows.length - limit})
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null),
+    { t } = useApp();
+  useEffect(() => {
+    const dialog = ref.current!;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+  return (
+    <dialog ref={ref} className="modal" onCancel={onClose}>
+      <div className="modal-heading">
+        <div>
+          <span className="eyebrow dark">AAROGYA DRISHTI</span>
+          <h2>{title}</h2>
+        </div>
+        <button
+          className="icon-button"
+          onClick={onClose}
+          aria-label={t("close")}
+        >
+          <X />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+
+function Registration({ onClose }: { onClose: () => void }) {
+  const { w, t, lang, notify } = useApp();
+  const [form, setForm] = useState<Record<string, unknown>>({
+    patient_id: crypto.randomUUID(),
+    screening_id: crypto.randomUUID(),
+    display_name: "",
+    age_years: "",
+    village: "",
+    contact_phone: "",
+    language: lang,
+    tobacco: "never",
+    notes: "",
+    discomfort: false,
+    consent: false,
+    photo_consent: false,
+  });
+  const [ready, setReady] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    void w
+      .loadForm()
+      .then((saved) => {
+        if (live) {
+          if (saved) setForm(saved);
+          setReady(true);
+        }
+      })
+      .catch((e) => {
+        setError(message(e));
+        setReady(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (ready) {
+      const timer = setTimeout(
+        () => void w.saveForm(form).catch((e) => setError(message(e))),
+        250,
+      );
+      return () => clearTimeout(timer);
+    }
+  }, [form, ready]);
+  const change = (key: string, value: unknown) =>
+    setForm((f) => ({ ...f, [key]: value }));
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const state = await w.execute("register", {
+        ...form,
+        age_years: Number(form.age_years),
+      });
+      await w.saveForm(null);
+      notify(t(state === "queued" ? "draftQueued" : "saved"));
+      onClose();
+    } catch (e) {
+      setError(message(e));
+    }
+  };
+  return (
+    <Modal title={t("newPatient")} onClose={onClose}>
+      <form onSubmit={submit} className="registration-form">
+        <div className="form-notice">
+          <ShieldCheck size={18} />
+          {t("consentHelp")}
+        </div>
+        <div className="section-label">
+          <span>01</span>
+          {t("details")}
+        </div>
+        <div className="form-grid">
+          <Field label={t("name")}>
+            <input
+              required
+              maxLength={120}
+              autoComplete="off"
+              value={String(form.display_name)}
+              onChange={(e) => change("display_name", e.target.value)}
+            />
+          </Field>
+          <Field label={t("age")}>
+            <input
+              type="number"
+              required
+              min="0"
+              max="120"
+              value={String(form.age_years)}
+              onChange={(e) => change("age_years", e.target.value)}
+            />
+          </Field>
+          <Field label={t("village")}>
+            <input
+              required
+              maxLength={120}
+              value={String(form.village)}
+              onChange={(e) => change("village", e.target.value)}
+            />
+          </Field>
+          <Field label={t("phone")}>
+            <input
+              type="tel"
+              maxLength={20}
+              value={String(form.contact_phone)}
+              onChange={(e) => change("contact_phone", e.target.value)}
+            />
+          </Field>
+          <Field label={t("language")}>
+            <select
+              value={String(form.language)}
+              onChange={(e) => change("language", e.target.value)}
+            >
+              <option value="te">తెలుగు</option>
+              <option value="en">English</option>
+            </select>
+          </Field>
+        </div>
+        <div className="section-label">
+          <span>02</span>
+          {t("history")}
+        </div>
+        <div className="form-grid">
+          <Field label={t("tobacco")}>
+            <select
+              value={String(form.tobacco)}
+              onChange={(e) => change("tobacco", e.target.value)}
+            >
+              {(["never", "former", "current"] as const).map((key) => (
+                <option key={key} value={key}>
+                  {t(key)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={Boolean(form.discomfort)}
+              onChange={(e) => change("discomfort", e.target.checked)}
+            />
+            {t("discomfort")}
+          </label>
+        </div>
+        <Field label={t("notes")}>
+          <textarea
+            maxLength={5000}
+            rows={3}
+            value={String(form.notes)}
+            onChange={(e) => change("notes", e.target.value)}
+          />
+        </Field>
+        <div className="consent-box">
+          <label className="check-field">
+            <input
+              type="checkbox"
+              required
+              checked={Boolean(form.consent)}
+              onChange={(e) => change("consent", e.target.checked)}
+            />
+            {t("consent")}
+          </label>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={Boolean(form.photo_consent)}
+              onChange={(e) => change("photo_consent", e.target.checked)}
+            />
+            {t("photoConsent")}
+          </label>
+        </div>
+        {error && (
+          <div className="error-box" role="alert">
+            {error}
+          </div>
+        )}
+        <div className="modal-footer">
+          <span>
+            <Cloud size={15} />
+            {t("draftSaved")}
+          </span>
+          <button type="button" className="button secondary" onClick={onClose}>
+            {t("cancel")}
+          </button>
+          <button
+            type="submit"
+            className="button primary"
+            disabled={w.busy || !ready}
+          >
+            {w.busy ? (
+              <LoaderCircle className="spin" size={17} />
+            ) : (
+              <Check size={17} />
+            )}{" "}
+            {t(w.busy ? "saving" : "save")}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+export function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function PatientDetail({
+  patient,
+  back,
+  onReports,
+}: {
+  patient: Patient;
+  back: () => void;
+  onReports: () => void;
+}) {
+  const { w, t, lang, run, notify } = useApp(),
+    [tab, setTab] = useState<
+      "clinical" | "photos" | "timeline" | "care" | "appointments"
+    >("clinical"),
+    [findings, setFindings] = useState(""),
+    [decision, setDecision] = useState("refer"),
+    [priority, setPriority] = useState("routine"),
+    [diagnosis, setDiagnosis] = useState(""),
+    [booking, setBooking] = useState(false),
+    [imageBusy, setImageBusy] = useState(false);
+  const [oralView, setOralView] = useState("cheek");
+  const [followupAt, setFollowupAt] = useState("");
+  const screening = latestScreening(w.data, patient.id),
+    reviews = w.data.clinical_reviews.filter(
+      (r) => r.patient_id === patient.id,
+    ),
+    referrals = w.data.referrals.filter((r) => r.patient_id === patient.id),
+    images = w.data.images.filter((i) => i.patient_id === patient.id),
+    investigations = w.data.investigations.filter(
+      (i) => i.patient_id === patient.id,
+    ),
+    isClinician = clinician(w.profile?.role),
+    isNavigator = w.profile?.role === "navigator";
+  const photoConsent = hasConsent(w.data, patient.id, "image_capture");
+  const upload = async (file?: File) => {
+    if (!file) return;
+    setImageBusy(true);
+    try {
+      const result = await inspectImage(file);
+      await w.execute("image", {
+        patient_id: patient.id,
+        oral_view: oralView,
+        ...result,
+      });
+      notify(
+        t(result.quality_status === "acceptable" ? "acceptable" : "recapture"),
+      );
+    } catch (e) {
+      notify(message(e), true);
+    } finally {
+      setImageBusy(false);
+    }
+  };
+  return (
+    <>
+      <button className="back-link" onClick={back}>
+        <ChevronLeft size={17} />
+        {t("back")}
+      </button>
+      <PageHeading
+        title={patient.display_name}
+        subtitle={`${shortId(patient.id)} · ${patient.age_years} ${t("years")} · ${patient.village}`}
+        action={screening ? <Badge status={screening.status} /> : null}
+      />
+      <GuidedJourney
+        patient={patient}
+        onNavigate={(target) => {
+          if (target === "reports") onReports();
+          else
+            setTab(
+              isNavigator && target !== "appointments" ? "timeline" : target,
+            );
+        }}
+      />
+      <div className="detail-layout">
+        <section className="panel">
+          <div className="tabs" role="tablist">
+            {(
+              [
+                "clinical",
+                "photos",
+                "care",
+                "appointments",
+                "timeline",
+              ] as const
+            )
+              .filter(
+                (key) =>
+                  (!isNavigator ||
+                    key === "timeline" ||
+                    key === "appointments") &&
+                  (key !== "care" || isClinician),
+              )
+              .map((key) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={
+                    (isNavigator && tab !== "appointments"
+                      ? "timeline"
+                      : tab) === key
+                  }
+                  onClick={() => setTab(key)}
+                >
+                  {key === "care"
+                    ? lang === "te"
+                      ? "చికిత్స ప్రణాళిక"
+                      : "Care plan"
+                    : t(key)}
+                </button>
+              ))}
+          </div>
+          <div className="detail-body">
+            {tab === "appointments" ? (
+              <PatientAppointments
+                patient={patient}
+                onBook={() => setBooking(true)}
+              />
+            ) : tab === "care" && isClinician ? (
+              <PatientCare key={patient.id} patient={patient} />
+            ) : tab === "photos" && !isNavigator ? (
+              <>
+                <h2>{t("photos")}</h2>
+                <p className="muted">{t("photoHelp")}</p>
+                <div className="form-notice">{t("qualityNote")}</div>
+                <Field label={lang === "te" ? "నోటి భాగం" : "Oral view"}>
+                  <select
+                    value={oralView}
+                    onChange={(e) => setOralView(e.target.value)}
+                  >
+                    {[
+                      ["cheek", "Cheek", "చెంప"],
+                      ["tongue", "Tongue", "నాలుక"],
+                      ["palate", "Palate", "అంగిలి"],
+                      ["gums", "Gums", "చిగుళ్లు"],
+                      ["floor_of_mouth", "Floor of mouth", "నోటి అడుగు భాగం"],
+                    ].map(([value, en, te]) => (
+                      <option key={value} value={value}>
+                        {lang === "te" ? te : en}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {isCloud && !w.services.files ? (
+                  <div className="empty">
+                    <Camera size={30} />
+                    <p>{t("cloudPhoto")}</p>
+                  </div>
+                ) : !photoConsent ? (
+                  <div className="form-notice">{t("photoMissing")}</div>
+                ) : (
+                  <label
+                    className={`upload-area ${imageBusy ? "disabled" : ""}`}
+                  >
+                    <Camera size={27} />
+                    <strong>{t("capture")}</strong>
+                    <span>{t("photoHelp")}</span>
+                    <input
+                      aria-label={t("capture")}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      disabled={imageBusy || w.busy}
+                      onChange={(e) => void upload(e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+                {images.length === 0 && <Empty text={t("noPhotos")} />}
+                <div className="photo-grid">
+                  {images.map((image) => (
+                    <article className="photo-card" key={image.id}>
+                      {image.preview && photoConsent ? (
+                        <img src={image.preview} alt={t("photos")} />
+                      ) : (
+                        <div className="photo-placeholder">
+                          <ShieldCheck />
+                          {t("protected")}
+                        </div>
+                      )}
+                      <div>
+                        <span
+                          className={`badge ${image.quality_status === "acceptable" ? "badge-completed" : "badge-missed"}`}
+                        >
+                          {t(
+                            image.quality_status === "acceptable"
+                              ? "acceptable"
+                              : "recapture",
+                          )}
+                        </span>
+                        <p className="small muted">
+                          {image.quality_details &&
+                            `Exposure ${image.quality_details.brightness} · Sharpness ${image.quality_details.sharpness}`}
+                        </p>
+                        {isCloud && (
+                          <button
+                            className="button subtle"
+                            disabled={!photoConsent}
+                            onClick={() =>
+                              void run(async () => {
+                                const file = await careApi<{ url: string }>(
+                                  "download",
+                                  { kind: "oral", id: image.id },
+                                );
+                                downloadUrl(file.url, "oral-photo.jpg");
+                              })
+                            }
+                          >
+                            {lang === "te"
+                              ? "చిత్రం డౌన్‌లోడ్"
+                              : "Download photo"}
+                          </button>
+                        )}
+                        {w.data.ai_analyses.some(
+                          (a) => a.image_id === image.id,
+                        ) ? (
+                          <div className="mock-result">
+                            {w.data.ai_analyses
+                              .filter((a) => a.image_id === image.id)
+                              .map((a) => (
+                                <p key={a.id}>
+                                  {a.provider === "mock"
+                                    ? t("mockResult")
+                                    : `${a.research_label} · ${a.model_version} · ${lang === "te" ? "పరిశోధన మాత్రమే; వైద్య సమీక్ష అవసరం" : "Research only; clinician review required"}`}
+                                </p>
+                              ))}
+                          </div>
+                        ) : (
+                          <button
+                            disabled={
+                              w.busy ||
+                              !photoConsent ||
+                              image.quality_status !== "acceptable" ||
+                              (isCloud && !w.services.ai)
+                            }
+                            className="button secondary"
+                            onClick={() =>
+                              void run(() =>
+                                w.execute("analyze", { image_id: image.id }),
+                              )
+                            }
+                          >
+                            <Sparkles size={15} />
+                            {isCloud
+                              ? lang === "te"
+                                ? "పరిశోధన విశ్లేషణ"
+                                : "Run research analysis"
+                              : t("analyze")}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {isCloud && !w.services.ai && (
+                  <p className="form-notice">
+                    {lang === "te"
+                      ? "పరీక్ష మోడల్ ఇంకా అనుసంధానం కాలేదు."
+                      : "A trained screening model has not been connected. Image quality checks remain available."}
+                  </p>
+                )}
+              </>
+            ) : tab === "timeline" || isNavigator ? (
+              <div className="timeline">
+                {[
+                  {
+                    date: patient.created_at,
+                    label: t("registration"),
+                    text: shortId(patient.id),
+                  },
+                  ...reviews.map((r) => ({
+                    date: r.signed_at,
+                    label: t("review"),
+                    text: r.findings,
+                  })),
+                  ...w.data.appointments
+                    .filter((a) => a.patient_id === patient.id)
+                    .map((a) => ({
+                      date: a.created_at,
+                      label: t("appointments"),
+                      text: statusLabel(a.status, lang),
+                    })),
+                  ...investigations.map((i) => ({
+                    date: i.created_at,
+                    label: t("pathology"),
+                    text: i.clinician_diagnosis,
+                  })),
+                  ...w.data.treatment_events
+                    .filter((e) => e.patient_id === patient.id)
+                    .map((e) => ({
+                      date: e.created_at,
+                      label:
+                        lang === "te"
+                          ? "చికిత్స పురోగతి"
+                          : "Treatment progress",
+                      text: e.notes,
+                    })),
+                  ...w.data.consents
+                    .filter((c) => c.patient_id === patient.id)
+                    .map((c) => ({
+                      date: c.recorded_at,
+                      label:
+                        lang === "te" ? "సమ్మతి చరిత్ర" : "Consent history",
+                      text: `${c.purpose.replaceAll("_", " ")} · ${c.granted ? (lang === "te" ? "అంగీకరించారు" : "Granted") : lang === "te" ? "ఉపసంహరించారు" : "Withdrawn"}`,
+                    })),
+                ]
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((event, i) => (
+                    <article key={i}>
+                      <span className="timeline-dot" />
+                      <div>
+                        <small>{dateLabel(event.date, lang, true)}</small>
+                        <h3>{event.label}</h3>
+                        <p>{event.text}</p>
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            ) : (
+              <>
+                <div className="section-label">
+                  <ClipboardCheck size={18} />
+                  {t("history")}
+                </div>
+                <dl className="clinical-facts">
+                  <div>
+                    <dt>{t("tobacco")}</dt>
+                    <dd>
+                      {screening
+                        ? statusLabel(
+                            String(screening.tobacco_history.use ?? "—"),
+                            lang,
+                          )
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t("language")}</dt>
+                    <dd>
+                      {patient.preferred_language === "te"
+                        ? "తెలుగు"
+                        : "English"}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="observation">
+                  <span>{t("notes")}</span>
+                  <p>{screening?.examination_notes || "—"}</p>
+                </div>
+                {reviews.map((review) => (
+                  <article className="review-card" key={review.id}>
+                    <div>
+                      <ShieldCheck size={17} />
+                      <strong>{t("review")}</strong>
+                      <small>{dateLabel(review.signed_at, lang)}</small>
+                    </div>
+                    <p>{review.findings}</p>
+                    <span className="small muted">
+                      {statusLabel(review.clinical_decision, lang)}
+                    </span>
+                  </article>
+                ))}
+                {isClinician && screening && screening.status !== "closed" ? (
+                  <form
+                    className="review-form"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (
+                        await run(() =>
+                          w.execute("review", {
+                            patient_id: patient.id,
+                            revision: screening.revision,
+                            findings,
+                            decision,
+                            priority,
+                            followup_at: followupAt
+                              ? new Date(followupAt).toISOString()
+                              : undefined,
+                          }),
+                        )
+                      )
+                        setFindings("");
+                    }}
+                  >
+                    <h2>{t("independent")}</h2>
+                    <p className="muted small">{t("reviewNote")}</p>
+                    <Field label={t("findings")}>
+                      <textarea
+                        required
+                        maxLength={5000}
+                        rows={4}
+                        value={findings}
+                        onChange={(e) => setFindings(e.target.value)}
+                      />
+                    </Field>
+                    <div className="form-grid">
+                      <Field label={t("decision")}>
+                        <select
+                          value={decision}
+                          onChange={(e) => setDecision(e.target.value)}
+                        >
+                          <option value="refer">{t("refer")}</option>
+                          <option value="follow_up">{t("follow_up")}</option>
+                          <option value="close">{t("closeCase")}</option>
+                        </select>
+                      </Field>
+                      {decision === "refer" && (
+                        <Field label={t("priority")}>
+                          <select
+                            value={priority}
+                            onChange={(e) => setPriority(e.target.value)}
+                          >
+                            <option value="routine">{t("routine")}</option>
+                            <option value="priority">
+                              {t("priorityValue")}
+                            </option>
+                            <option value="urgent">{t("urgent")}</option>
+                          </select>
+                        </Field>
+                      )}
+                      {decision === "follow_up" && (
+                        <Field
+                          label={
+                            lang === "te" ? "ఫాలో అప్ తేదీ" : "Follow-up date"
+                          }
+                        >
+                          <input
+                            type="datetime-local"
+                            required
+                            value={followupAt}
+                            onChange={(e) => setFollowupAt(e.target.value)}
+                          />
+                        </Field>
+                      )}
+                    </div>
+                    <button className="button primary" disabled={w.busy}>
+                      <CheckCircle2 size={17} />
+                      {t("sign")}
+                    </button>
+                  </form>
+                ) : (
+                  !isClinician && (
+                    <div className="form-notice">
+                      <Stethoscope size={19} />
+                      {t("onlyDoctor")}
+                    </div>
+                  )
+                )}
+                {isClinician &&
+                  referrals.length > 0 &&
+                  screening?.status !== "closed" && (
+                    <form
+                      className="review-form"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (
+                          await run(() =>
+                            w.execute("diagnosis", {
+                              referral_id: referrals[0].id,
+                              diagnosis,
+                            }),
+                          )
+                        )
+                          setDiagnosis("");
+                      }}
+                    >
+                      <h2>{t("pathology")}</h2>
+                      <Field label={t("diagnosis")}>
+                        <textarea
+                          required
+                          rows={3}
+                          maxLength={5000}
+                          value={diagnosis}
+                          onChange={(e) => setDiagnosis(e.target.value)}
+                        />
+                      </Field>
+                      <button className="button secondary" disabled={w.busy}>
+                        <FileText size={17} />
+                        {t("saveOutcome")}
+                      </button>
+                    </form>
+                  )}
+                {investigations.map((i) => (
+                  <article key={i.id} className="review-card">
+                    <strong>{t("pathology")}</strong>
+                    <p>{i.clinician_diagnosis}</p>
+                  </article>
+                ))}
+              </>
+            )}
+          </div>
+        </section>
+        <aside className="detail-side">
+          {!isNavigator && <ConsentPanel patient={patient} />}
+          {referrals.length > 0 &&
+            tab !== "appointments" &&
+            screening?.status !== "closed" &&
+            (isClinician || isNavigator) && (
+              <section className="panel detail-card">
+                <CalendarDays size={25} />
+                <h3>{t("appointments")}</h3>
+                <p>{t("videoHelp")}</p>
+                <button
+                  className="button primary"
+                  onClick={() => setBooking(true)}
+                >
+                  <Plus size={16} />
+                  {t("booking")}
+                </button>
+              </section>
+            )}
+        </aside>
+      </div>
+      {isClinician && <CaseDecisions key={patient.id} patient={patient} />}
+      {booking && (
+        <Booking
+          referralId={referrals[0].id}
+          onClose={() => setBooking(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function Booking({
+  referralId,
+  onClose,
+}: {
+  referralId: string;
+  onClose: () => void;
+}) {
+  const { w, t, run } = useApp();
+  const [starts, setStarts] = useState(""),
+    [mode, setMode] = useState("in_person");
+  return (
+    <Modal title={t("booking")} onClose={onClose}>
+      <form
+        className="registration-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (
+            await run(() =>
+              w.execute("appoint", {
+                referral_id: referralId,
+                starts_at: new Date(starts).toISOString(),
+                mode,
+              }),
+            )
+          )
+            onClose();
+        }}
+      >
+        <Field label={t("date")}>
+          <input
+            type="datetime-local"
+            required
+            value={starts}
+            onChange={(e) => setStarts(e.target.value)}
+          />
+        </Field>
+        <Field label={t("mode")}>
+          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="in_person">{t("inPerson")}</option>
+            <option value="video">{t("video")}</option>
+          </select>
+        </Field>
+        {mode === "video" && (
+          <div className="form-notice">{t("videoHelp")}</div>
+        )}
+        <div className="modal-footer">
+          <button type="button" className="button secondary" onClick={onClose}>
+            {t("cancel")}
+          </button>
+          <button className="button primary" disabled={w.busy}>
+            {t("book")}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function Appointments({ openPatient }: { openPatient: (id: string) => void }) {
+  const { w, t, lang, run } = useApp(),
+    canEdit = clinician(w.profile?.role) || w.profile?.role === "navigator";
+  return (
+    <>
+      <PageHeading title={t("appointments")} subtitle={t("referralHint")} />
+      <div className="form-notice">
+        <Video size={19} />
+        {t("videoHelp")}
+      </div>
+      <div className="appointment-grid">
+        {[...w.data.appointments]
+          .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+          .map((a) => (
+            <article className="panel appointment-card" key={a.id}>
+              <div className="appointment-top">
+                <span
+                  className={`metric-icon ${a.mode === "video" ? "blue" : "green"}`}
+                >
+                  {a.mode === "video" ? (
+                    <Video size={22} />
+                  ) : (
+                    <Stethoscope size={22} />
+                  )}
+                </span>
+                <Badge status={a.status} />
+              </div>
+              <h2>
+                {w.data.patients.find((p) => p.id === a.patient_id)
+                  ?.display_name ?? shortId(a.patient_id)}
+              </h2>
+              <p>
+                <CalendarDays size={15} />
+                {dateLabel(a.starts_at, lang, true)} IST
+              </p>
+              <p>
+                <MapPin size={15} />
+                {a.mode === "video" ? t("video") : t("inPerson")}
+              </p>
+              {a.mode === "video" && (
+                <span className="small muted">
+                  {isCloud && w.services.video
+                    ? lang === "te"
+                      ? "సమ్మతి మరియు అపాయింట్‌మెంట్ సమయం అవసరం"
+                      : "Consent and appointment time required to join"
+                    : t("videoPending")}
+                </span>
+              )}
+              <div className="appointment-actions">
+                <button
+                  className="text-button"
+                  onClick={() => openPatient(a.patient_id)}
+                >
+                  {t("open")}
+                  <ArrowUpRight size={16} />
+                </button>
+                {canEdit &&
+                  ["confirmed", "requested", "rescheduled"].includes(
+                    a.status,
+                  ) && (
+                    <div className="action-pair">
+                      <button
+                        className="button secondary"
+                        disabled={w.busy}
+                        onClick={() =>
+                          void run(() =>
+                            w.execute("attendance", {
+                              appointment_id: a.id,
+                              status: "completed",
+                            }),
+                          )
+                        }
+                      >
+                        {t("markComplete")}
+                      </button>
+                      <button
+                        className="button subtle"
+                        disabled={w.busy}
+                        onClick={() =>
+                          void run(() =>
+                            w.execute("attendance", {
+                              appointment_id: a.id,
+                              status: "missed",
+                            }),
+                          )
+                        }
+                      >
+                        {t("markMissed")}
+                      </button>
+                    </div>
+                  )}
+              </div>
+              <AppointmentTools appointment={a} />
+            </article>
+          ))}
+      </div>
+      {w.data.appointments.length === 0 && <Empty text={t("noAppointments")} />}
+      <RemindersPanel />
+    </>
+  );
+}
+
+function FollowUps({ openPatient }: { openPatient: (id: string) => void }) {
+  const { w, t, lang, run } = useApp(),
+    [showAll, setShowAll] = useState(false),
+    canEdit = clinician(w.profile?.role) || w.profile?.role === "navigator";
+  const tasks = w.data.navigation_tasks.filter(
+    (task) => showAll || task.status === "pending",
+  );
+  return (
+    <>
+      <PageHeading title={t("followupTitle")} subtitle={t("followupText")} />
+      <div className="filter-tabs">
+        <button
+          className={!showAll ? "selected" : ""}
+          onClick={() => setShowAll(false)}
+        >
+          {t("pending")}{" "}
+          <b>
+            {
+              w.data.navigation_tasks.filter((t) => t.status === "pending")
+                .length
+            }
+          </b>
+        </button>
+        <button
+          className={showAll ? "selected" : ""}
+          onClick={() => setShowAll(true)}
+        >
+          {t("all")}
+        </button>
+      </div>
+      <div className="task-list">
+        {tasks.map((task) => (
+          <article className="panel task-card" key={task.id}>
+            <span
+              className={`metric-icon ${task.task_type === "missed_visit" ? "orange" : "green"}`}
+            >
+              <HeartHandshake size={24} />
+            </span>
+            <div className="task-copy">
+              <span className="eyebrow dark">
+                {statusLabel(task.task_type, lang)}
+              </span>
+              <button
+                className="text-button task-name"
+                onClick={() => openPatient(task.patient_id)}
+              >
+                {w.data.patients.find((p) => p.id === task.patient_id)
+                  ?.display_name ?? shortId(task.patient_id)}
+                <ArrowUpRight size={14} />
+              </button>
+              <small>
+                {t("due")} {dateLabel(task.due_at, lang)} ·{" "}
+                {shortId(task.patient_id)}
+              </small>
+            </div>
+            <Badge status={task.status} />
+            {canEdit && task.status === "pending" && (
+              <div className="task-actions">
+                <button
+                  className="button secondary"
+                  disabled={w.busy}
+                  onClick={() =>
+                    void run(() =>
+                      w.execute("followup", {
+                        task_id: task.id,
+                        status: "completed",
+                      }),
+                    )
+                  }
+                >
+                  <Check size={16} />
+                  {t("completeTask")}
+                </button>
+                <button
+                  className="text-button muted"
+                  disabled={w.busy}
+                  onClick={() =>
+                    void run(() =>
+                      w.execute("followup", {
+                        task_id: task.id,
+                        status: "lost_contact",
+                      }),
+                    )
+                  }
+                >
+                  {t("lostContact")}
+                </button>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+      {tasks.length === 0 && <Empty text={t("emptyTask")} />}
+    </>
+  );
+}
+
+function AggregateChart() {
+  const { w, t } = useApp();
+  const rows = [
+    { label: t("total"), value: w.summary.patients },
+    { label: t("screening"), value: w.summary.screenings },
+    { label: t("referrals"), value: w.summary.referrals },
+    { label: t("pending"), value: w.summary.pending_follow_ups },
+  ];
+  return (
+    <div className="aggregate-chart">
+      {rows.map((r, i) => (
+        <div className="chart-row" key={r.label}>
+          <span>{r.label}</span>
+          <div>
+            <span
+              style={{
+                width: `${Math.max(2, (r.value / Math.max(w.summary.patients, w.summary.screenings, 1)) * 100)}%`,
+                opacity: 1 - i * 0.14,
+              }}
+            />
+          </div>
+          <strong>{r.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Reports() {
+  const { w, t } = useApp();
+  const rate = w.summary.screenings
+    ? Math.round((w.summary.referrals / w.summary.screenings) * 100)
+    : 0;
+  const download = () => {
+    const blob = new Blob(
+      [
+        "metric,count\n" +
+          Object.entries(w.summary)
+            .flatMap(([key, value]) =>
+              typeof value === "object"
+                ? Object.entries(value).map(
+                    ([stage, count]) => `stage_${stage},${count}`,
+                  )
+                : [`${key},${value}`],
+            )
+            .join("\n"),
+      ],
+      { type: "text/csv;charset=utf-8;" },
+    );
+    const url = URL.createObjectURL(blob),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = "aarogya-synthetic-summary.csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <>
+      <PageHeading
+        title={t("reportsTitle")}
+        subtitle={t("reportsText")}
+        action={
+          <button className="button secondary" onClick={download}>
+            <ArrowDownToLine size={18} />
+            {t("export")}
+          </button>
+        }
+      />
+      <div className="report-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>{t("journey")}</h2>
+            <Activity size={20} />
+          </div>
+          <AggregateChart />
+        </section>
+        <section className="panel coverage">
+          <div
+            className="donut"
+            style={{
+              background: `conic-gradient(var(--green) ${Math.min(rate, 100)}%, #e8efeb 0)`,
+            }}
+          >
+            <div>
+              <strong>{rate}%</strong>
+              <span>{t("referral")}</span>
+            </div>
+          </div>
+          <h2>{t("referralRate")}</h2>
+          <p>{t("referralRateHelp")}</p>
+        </section>
+      </div>
+      <OutreachPanel />
+      <JourneyMetrics />
+    </>
+  );
+}
+
+function WorkspaceSettings() {
+  const { w, t, lang, run } = useApp();
+  return (
+    <>
+      <PageHeading title={t("settingsTitle")} subtitle={t("nonclinical")} />
+      <div className="settings-grid">
+        <IntegrationStatus />
+        <section className="panel settings-card">
+          <span className="metric-icon green">
+            <Database size={23} />
+          </span>
+          <h2>{t("connection")}</h2>
+          <Badge status={isCloud ? "confirmed" : "pending"} />
+          <h3>{isCloud ? t("cloud") : t("demo")}</h3>
+          <p>{isCloud ? t("protected") : t("cloudHelp")}</p>
+          {isCloud ? (
+            <button
+              className="button secondary"
+              onClick={() => void run(w.signOut, t("signOut"))}
+            >
+              <LogOut size={16} />
+              {t("signOut")}
+            </button>
+          ) : (
+            <>
+              <Field label={t("demoRole")}>
+                <select
+                  value={w.profile?.role}
+                  onChange={(e) =>
+                    void run(
+                      () => w.changeRole(e.target.value as Role),
+                      roleLabel(e.target.value as Role, lang),
+                    )
+                  }
+                >
+                  {demoProfiles.map((p) => (
+                    <option key={p.role} value={p.role}>
+                      {roleLabel(p.role, lang)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <p className="small muted">{t("demoRoleHelp")}</p>
+              <button
+                className="button secondary"
+                disabled={w.busy}
+                onClick={() => {
+                  if (window.confirm(t("resetConfirm"))) void run(w.reset);
+                }}
+              >
+                <RefreshCw size={16} />
+                {t("reset")}
+              </button>
+            </>
+          )}
+        </section>
+        <section className="panel settings-card">
+          <span className="metric-icon blue">
+            <Cloud size={23} />
+          </span>
+          <h2>{t("drafts")}</h2>
+          <p>{t("queuedHelp")}</p>
+          {w.drafts.length === 0 ? (
+            <Empty text={t("noDrafts")} />
+          ) : (
+            w.drafts.map((d) => (
+              <div key={d.id} className="draft-row">
+                <strong>{String(d.payload.display_name)}</strong>
+                <Badge status={d.status} />
+                {d.error && <p className="error-text">{d.error}</p>}
+              </div>
+            ))
+          )}
+          <button
+            className="button primary"
+            disabled={w.busy || !w.online || w.drafts.length === 0}
+            onClick={() => void run(w.sync)}
+          >
+            <RefreshCw size={16} />
+            {t("sync")}
+          </button>
+        </section>
+      </div>
+    </>
+  );
+}
+
+function Login({
+  lang,
+  setLang,
+}: {
+  lang: Language;
+  setLang: (lang: Language) => void;
+}) {
+  const { w, t } = useApp(),
+    [email, setEmail] = useState(""),
+    [password, setPassword] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const login = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      if (!supabase)
+        throw new Error(configurationError ?? "Workspace is loading.");
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="login-page">
+      <section className="login-brand">
+        <div className="brand">
+          <img src="/icon.svg" alt="" />
+          <span>
+            Aarogya<span className="brand-second">Drishti.</span>
+          </span>
+        </div>
+        <h1>{t("hello")}</h1>
+        <p>{t("intro")}</p>
+        <Landscape />
+        <span className="eyebrow">{t("programme")}</span>
+      </section>
+      <section className="login-form">
+        <div className="language-switch">
+          <button
+            className={lang === "en" ? "selected" : ""}
+            onClick={() => setLang("en")}
+          >
+            EN
+          </button>
+          <button
+            className={lang === "te" ? "selected" : ""}
+            onClick={() => setLang("te")}
+          >
+            తెలుగు
+          </button>
+        </div>
+        {w.loading ? (
+          <div className="loading">
+            <LoaderCircle className="spin" />
+            {t("loading")}
+          </div>
+        ) : (
+          <>
+            <span className="metric-icon green">
+              <ShieldCheck size={25} />
+            </span>
+            <h2>{t("signIn")}</h2>
+            <p>{t("loginText")}</p>
+            <form onSubmit={login}>
+              <Field label={t("email")}>
+                <input
+                  type="email"
+                  required
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field label={t("password")}>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+              {(error || w.error) && (
+                <div className="error-box" role="alert">
+                  {error || w.error}
+                </div>
+              )}
+              <button
+                className="button primary"
+                disabled={busy || !!configurationError}
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={17} />
+                ) : (
+                  <ArrowRight size={17} />
+                )}{" "}
+                {t("signIn")}
+              </button>
+            </form>
+            <p className="small muted">{t("nonclinical")}</p>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
