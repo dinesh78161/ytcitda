@@ -5,7 +5,7 @@ export interface ServiceStatus {
   video: boolean;
   video_provider?: "livekit" | "daily" | "disabled";
   ai: boolean;
-  ai_provider?: "mock" | "research" | "disabled";
+  ai_provider?: "mock" | "research" | "gemini" | "disabled";
   reminders: boolean;
 }
 export type VideoAccess =

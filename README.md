@@ -56,7 +56,7 @@ server serves both the frontend and API; use `npm run build:render` and `npm sta
 
 ## Connect Supabase
 
-Follow [Supabase setup](docs/SUPABASE_SETUP.md). Apply all **five** migrations,
+Follow [Supabase setup](docs/SUPABASE_SETUP.md). Apply all **six** migrations,
 create the demo Auth accounts, and configure an ignored `.env`:
 
 ```dotenv

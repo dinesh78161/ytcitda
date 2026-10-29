@@ -5,8 +5,16 @@
     "version": "0.1.0",
     "description": "Synthetic demonstration only. Database workflows use authenticated Supabase RPCs documented in docs/API_CONTRACT.md. Status flags report configuration presence, not provider connectivity."
   },
-  "servers": [{ "url": "/" }],
-  "security": [{ "staffToken": [] }],
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "staffToken": []
+    }
+  ],
   "paths": {
     "/api/status": {
       "get": {
@@ -20,15 +28,27 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "database": { "type": "boolean" },
-                    "files": { "type": "boolean" },
-                    "video": { "type": "boolean" },
+                    "database": {
+                      "type": "boolean"
+                    },
+                    "files": {
+                      "type": "boolean"
+                    },
+                    "video": {
+                      "type": "boolean"
+                    },
                     "video_provider": {
                       "enum": ["livekit", "daily", "disabled"]
                     },
-                    "ai": { "type": "boolean" },
-                    "ai_provider": { "enum": ["mock", "research", "disabled"] },
-                    "reminders": { "type": "boolean" }
+                    "ai": {
+                      "type": "boolean"
+                    },
+                    "ai_provider": {
+                      "enum": ["mock", "research", "gemini", "disabled"]
+                    },
+                    "reminders": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
@@ -45,7 +65,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/Upload" }
+              "schema": {
+                "$ref": "#/components/schemas/Upload"
+              }
             }
           }
         },
@@ -58,14 +80,21 @@
                   "type": "object",
                   "required": ["id"],
                   "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "quality_status": { "enum": ["acceptable", "recapture"] }
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "quality_status": {
+                      "enum": ["acceptable", "recapture"]
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -80,8 +109,13 @@
                 "type": "object",
                 "required": ["id", "kind"],
                 "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "kind": { "enum": ["oral", "report"] }
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "enum": ["oral", "report"]
+                  }
                 }
               }
             }
@@ -95,21 +129,28 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "url": { "type": "string", "format": "uri" },
-                    "expires_in": { "const": 60 }
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expires_in": {
+                      "const": 60
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
     "/api/analyze": {
       "post": {
-        "summary": "Store a labelled mock or pinned research result",
-        "description": "Requires an assigned acceptable-quality image and current photo consent. Analysis cannot make a clinical decision. Disabled or unavailable research mode never falls back to mock.",
+        "summary": "Store a mock result, research classification, or Gemini image observations",
+        "description": "Requires an assigned acceptable-quality image and current photo consent. Gemini requires migration 008 and returns structured observations with no numeric confidence. Assignment and consent are rechecked before saving. No analysis can make a clinical decision. Unavailable services never fall back to mock.",
         "requestBody": {
           "required": true,
           "content": {
@@ -118,7 +159,10 @@
                 "type": "object",
                 "required": ["image_id"],
                 "properties": {
-                  "image_id": { "type": "string", "format": "uuid" }
+                  "image_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
                 }
               }
             }
@@ -132,24 +176,45 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "provider": { "enum": ["mock", "research"] },
-                    "model_version": { "type": "string" },
-                    "research_label": { "type": "string" },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "provider": {
+                      "enum": ["mock", "research"]
+                    },
+                    "model_version": {
+                      "type": "string"
+                    },
+                    "research_label": {
+                      "type": "string"
+                    },
                     "score": {
                       "type": ["number", "null"],
                       "minimum": 0,
                       "maximum": 1
                     },
-                    "clinical_use": { "const": false },
-                    "requires_clinician_review": { "const": true },
-                    "warning": { "const": "NOT FOR CLINICAL USE" }
+                    "clinical_use": {
+                      "const": false
+                    },
+                    "requires_clinician_review": {
+                      "const": true
+                    },
+                    "warning": {
+                      "const": "NOT FOR CLINICAL USE"
+                    },
+                    "findings": {
+                      "type": ["object", "null"],
+                      "description": "Gemini report: engine, prompt_version, image_kind, summary, visible_findings, possible_conditions with name and visual_basis, and limitations. Gemini reports always have score=null."
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -165,7 +230,10 @@
                 "type": "object",
                 "required": ["appointment_id"],
                 "properties": {
-                  "appointment_id": { "type": "string", "format": "uuid" }
+                  "appointment_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
                 }
               }
             }
@@ -188,20 +256,38 @@
                         "expires_at"
                       ],
                       "properties": {
-                        "provider": { "const": "livekit" },
-                        "server_url": { "type": "string", "format": "uri" },
-                        "token": { "type": "string" },
-                        "room_name": { "type": "string" },
-                        "expires_at": { "type": "integer" }
+                        "provider": {
+                          "const": "livekit"
+                        },
+                        "server_url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "token": {
+                          "type": "string"
+                        },
+                        "room_name": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "integer"
+                        }
                       }
                     },
                     {
                       "type": "object",
                       "required": ["provider", "url", "expires_at"],
                       "properties": {
-                        "provider": { "const": "daily" },
-                        "url": { "type": "string", "format": "uri" },
-                        "expires_at": { "type": "integer" }
+                        "provider": {
+                          "const": "daily"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expires_at": {
+                          "type": "integer"
+                        }
                       }
                     }
                   ]
@@ -209,7 +295,9 @@
               }
             }
           },
-          "default": { "$ref": "#/components/responses/Error" }
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     }
@@ -230,7 +318,11 @@
             "schema": {
               "type": "object",
               "required": ["error"],
-              "properties": { "error": { "type": "string" } }
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
             }
           }
         }
@@ -241,13 +333,18 @@
         "type": "object",
         "required": ["kind", "patient_id", "data_url"],
         "properties": {
-          "kind": { "enum": ["oral", "report"] },
+          "kind": {
+            "enum": ["oral", "report"]
+          },
           "request_id": {
             "type": "string",
             "format": "uuid",
             "description": "Stable UUID for retries; current browser derives this from actor, file and destination."
           },
-          "patient_id": { "type": "string", "format": "uuid" },
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "data_url": {
             "type": "string",
             "description": "Base64 data:image/jpeg or data:application/pdf. File limit 10 MiB; request limit 15 MiB; JPEG up to 4 megapixels, PDF up to 100 pages."
@@ -255,8 +352,14 @@
           "oral_view": {
             "enum": ["cheek", "tongue", "palate", "gums", "floor_of_mouth"]
           },
-          "investigation_id": { "type": ["string", "null"], "format": "uuid" },
-          "name": { "type": "string", "maxLength": 150 }
+          "investigation_id": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 150
+          }
         }
       }
     }

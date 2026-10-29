@@ -53,6 +53,9 @@ before(async () => {
     await db.exec(
       await sqlFile("supabase/migrations/202610280005_patient_journey.sql"),
     );
+    await db.exec(
+      await sqlFile("supabase/migrations/202610290008_image_findings.sql"),
+    );
   }
   for (const [index, name] of [
     "worker",

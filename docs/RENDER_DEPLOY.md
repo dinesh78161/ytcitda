@@ -41,6 +41,11 @@ Set `SCREENING_AI_MODE=mock` for the handbook demo. This is also the default if 
 research endpoint is set. `research` requires all three model settings; `disabled`
 allows an AI-failure rehearsal while clinicians continue reviewing cases.
 
+For Gemini image observations, use `SCREENING_AI_MODE=gemini`, set
+`GEMINI_MODEL=gemini-3.5-flash-lite`, and add `GEMINI_API_KEY` to the server
+environment. Apply the image-findings migration and deploy this Gemini-capable
+revision before selecting Gemini mode. See [Gemini setup](GEMINI_SETUP.md).
+
 For the no-card video demo, set `VIDEO_PROVIDER=livekit`, `LIVEKIT_URL`,
 `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` using a LiveKit Cloud Build project.
 See [integration setup](INTEGRATIONS.md). No separate video server runs on Render.

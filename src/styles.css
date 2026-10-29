@@ -2733,3 +2733,325 @@ main,
     font-size: 11px;
   }
 }
+
+/* Oral photograph and research analysis workspace. */
+.analysis-gallery {
+  grid-template-columns: minmax(0, 1fr);
+}
+.oral-analysis-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  border-radius: 13px;
+}
+.photo-card.oral-analysis-card > .oral-image-column {
+  padding: 20px;
+}
+.analysis-image-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  color: #587269;
+  margin-bottom: 14px;
+}
+.photo-card .oral-analysis-photo {
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  min-height: 220px;
+  object-fit: contain;
+  background: #f1f5f3;
+  border-radius: 9px;
+  display: block;
+}
+.oral-preview-placeholder {
+  min-height: 260px;
+  background: #f1f5f3;
+  border-radius: 9px;
+  gap: 10px;
+  padding: 25px;
+  text-align: center;
+  font-size: 12px;
+}
+.analysis-image-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0 20px;
+  color: #6e8179;
+  gap: 10px;
+}
+.analysis-image-actions small {
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.analysis-quality-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 19px;
+  border-top: 1px solid var(--border);
+}
+.analysis-quality-title > span:first-child {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 650;
+}
+.analysis-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+.analysis-quality-grid > div {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #f9fbf9;
+  padding: 14px 7px;
+  text-align: center;
+}
+.analysis-quality-grid dt {
+  color: #788b80;
+  font-size: 11px;
+}
+.analysis-quality-grid dd {
+  margin: 8px 0 0;
+  font-size: 21px;
+  font-weight: 650;
+}
+.photo-card p.analysis-quality-note {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #7a8981;
+}
+.analysis-findings {
+  border-left: 1px solid var(--border);
+  padding: 22px;
+  min-width: 0;
+}
+.analysis-findings-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.analysis-findings-heading h3 {
+  font-size: 19px;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.analysis-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 1px;
+  color: #77897f;
+}
+.analysis-mode {
+  display: inline-block;
+  flex-shrink: 0;
+  background: #f5efe0;
+  color: #8a6930;
+  border: 1px solid #e8ddc3;
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 8px;
+  font-weight: 700;
+}
+.analysis-result-box {
+  padding: 17px;
+  border: 1px solid #e1e7e0;
+  border-radius: 10px;
+  background: #f6f8f4;
+}
+.analysis-result-box h4 {
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 10px 0 18px;
+  overflow-wrap: anywhere;
+  text-transform: capitalize;
+}
+.analysis-score {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #667c71;
+}
+.analysis-score strong {
+  font-size: 27px;
+  color: #2d5a49;
+}
+.analysis-result-box meter {
+  width: 100%;
+  height: 12px;
+  margin-top: 9px;
+}
+.analysis-result-box meter::-webkit-meter-bar {
+  border: none;
+  background: #dfe8e1;
+}
+.analysis-result-box meter::-webkit-meter-optimum-value {
+  background: #32725c;
+}
+.photo-card .analysis-result-box p {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #65786d;
+  margin: 13px 0 0;
+}
+.analysis-scope-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.analysis-scope-grid > div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 13px;
+  min-width: 0;
+}
+.analysis-scope-grid span {
+  display: block;
+  color: #77877e;
+  font-size: 10px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.analysis-scope-grid strong {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.photo-card .analysis-scope-grid p {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #718178;
+  margin-bottom: 0;
+}
+.analysis-clinician-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  background: #f7f4e8;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 16px 0;
+  color: #796735;
+}
+.analysis-clinician-notice svg {
+  flex-shrink: 0;
+}
+.analysis-clinician-notice strong {
+  font-size: 12px;
+}
+.photo-card .analysis-clinician-notice p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin-bottom: 0;
+}
+.analysis-run {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+}
+.analysis-diagnostics {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 18px;
+  font-size: 11px;
+}
+.analysis-diagnostics summary {
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  line-height: 1.6;
+}
+.analysis-diagnostics dl > div {
+  margin-top: 13px;
+}
+.analysis-diagnostics dt {
+  color: #7d8b82;
+}
+.analysis-diagnostics dd {
+  margin: 5px 0 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1250px) {
+  .oral-analysis-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .analysis-findings {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+@media (max-width: 600px) {
+  .photo-card.oral-analysis-card > .oral-image-column,
+  .analysis-findings {
+    padding: 16px;
+  }
+  .analysis-findings-heading {
+    flex-wrap: wrap;
+  }
+  .analysis-scope-grid {
+    grid-template-columns: 1fr;
+  }
+  .analysis-findings-heading h3 {
+    font-size: 18px;
+  }
+  .analysis-image-heading {
+    font-size: 12px;
+  }
+}
+
+.vision-report {
+  margin: 18px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.photo-card .vision-report .vision-summary {
+  color: #294f40;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.vision-report h5 {
+  margin: 19px 0 9px;
+  font-size: 12px;
+  color: #345d4d;
+}
+.vision-report ul {
+  padding-left: 19px;
+  margin: 0;
+}
+.vision-report li {
+  font-size: 12px;
+  line-height: 1.75;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.vision-report li > span {
+  display: block;
+  color: #63796d;
+  margin-top: 3px;
+}
+.photo-card p.analysis-transfer-note {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #687e72;
+}

@@ -20,7 +20,8 @@
     "test:hosted:browser": "node --env-file-if-exists=.env.server node_modules/@playwright/test/cli.js test --config playwright.hosted.config.ts",
     "test:e2e": "playwright test",
     "test:production": "playwright test --config playwright.production.config.ts",
-    "format": "prettier --write src tests server scripts *.ts *.json docs README.md"
+    "format": "prettier --write src tests server scripts *.ts *.json docs README.md",
+    "ai:check": "node --env-file-if-exists=.env.server scripts/check-gemini.mjs"
   },
   "engines": {
     "node": ">=24.0.0"

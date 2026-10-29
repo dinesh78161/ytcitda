@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServices } from "../server/index.mjs";
 import { TokenVerifier } from "livekit-server-sdk";
-function harness(overrides = {}) {
+test("Gemini mode starts without rejecting the configured AI mode", () => {
+  const services = createServices({ SCREENING_AI_MODE: "gemini" });
+  assert.equal(services.status().ai, false);
+  assert.equal(services.status().ai_provider, "disabled");
+});
+function harness(overrides = {}, providerResponse) {
   const person = crypto.randomUUID(),
     actor = crypto.randomUUID(),
     appointment = crypto.randomUUID(),
@@ -41,11 +46,13 @@ function harness(overrides = {}) {
   };
   const writes = [],
     calls = [];
+  const validToken = `test.${Buffer.from(JSON.stringify({ sub: actor, aal: "aal2" })).toString("base64url")}.verified-by-test-stub`;
   const client = {
+    rpc: async () => ({ data: { version: 1 }, error: null }),
     auth: {
       getUser: async (token) => ({
-        data: { user: token === "valid" ? { id: actor } : null },
-        error: token === "valid" ? null : new Error("Invalid"),
+        data: { user: token === validToken ? { id: actor } : null },
+        error: token === validToken ? null : new Error("Invalid"),
       }),
     },
     from(table) {
@@ -104,6 +111,11 @@ function harness(overrides = {}) {
   const remote = async (url, options) => {
     const body = options.body ? JSON.parse(options.body) : null;
     calls.push({ url, options, body });
+    if (
+      providerResponse &&
+      url.startsWith("https://generativelanguage.googleapis.com/")
+    )
+      return providerResponse(body, options);
     if (options.method === "GET") return new Response("{}", { status: 404 });
     if (url.endsWith("/rooms"))
       return Response.json({
@@ -129,15 +141,183 @@ function harness(overrides = {}) {
     person,
     appointment,
     image,
+    validToken,
   };
 }
+
+const geminiReport = () => ({
+  image_kind: "oral_photo",
+  summary:
+    "Synthetic report fixture: a visible patch requires clinician review.",
+  visible_findings: ["Synthetic pale patch description."],
+  possible_conditions: [
+    {
+      name: "Possible irritation",
+      visual_basis: "Synthetic surface change; not a diagnosis.",
+    },
+  ],
+  limitations: ["A photograph cannot establish a diagnosis."],
+});
+const geminiResponse = (report = geminiReport()) =>
+  Response.json({
+    modelVersion: "gemini-3.8-flash",
+    candidates: [
+      {
+        finishReason: "STOP",
+        content: { parts: [{ text: JSON.stringify(report) }] },
+      },
+    ],
+  });
+
+test("Gemini receives only image data and returns persisted observations without a fabricated score", async () => {
+  const h = harness(
+    { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "synthetic-gemini-key" },
+    () => geminiResponse(),
+  );
+  assert.equal(h.services.status().ai_provider, "gemini");
+  const result = await h.services.handle(
+    "/api/analyze",
+    { image_id: h.image },
+    h.ctx,
+  );
+  assert.equal(result.provider, "research");
+  assert.equal(result.score, null);
+  assert.equal(result.findings.engine, "gemini");
+  assert.equal(result.findings.visible_findings.length, 1);
+  assert.equal(result.clinical_use, false);
+  assert.equal(result.requires_clinician_review, true);
+  const call = h.calls[0];
+  assert.ok(call.url.endsWith(":generateContent"));
+  assert.ok(!call.url.includes("synthetic-gemini-key"));
+  assert.equal(call.options.headers["x-goog-api-key"], "synthetic-gemini-key");
+  assert.equal(
+    call.body.contents[0].parts[0].inlineData.data,
+    Buffer.from("synthetic-jpeg").toString("base64"),
+  );
+  assert.ok(!JSON.stringify(call.body).includes(h.person));
+  assert.ok(!JSON.stringify(call.body).includes(h.ctx.profile.display_name));
+  assert.deepEqual(
+    h.writes.find((w) => w.table === "ai_analyses").value.findings,
+    result.findings,
+  );
+});
+
+test("Gemini refuses missing configuration and missing findings migration before sending an image", async () => {
+  const missing = harness({ SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "" });
+  assert.equal(missing.services.status().ai, false);
+  await assert.rejects(
+    () =>
+      missing.services.handle(
+        "/api/analyze",
+        { image_id: missing.image },
+        missing.ctx,
+      ),
+    (e) => e.status === 503,
+  );
+  assert.equal(missing.calls.length, 0);
+  const oldSchema = harness({
+    SCREENING_AI_MODE: "gemini",
+    GEMINI_API_KEY: "synthetic-key",
+  });
+  oldSchema.client.rpc = async () => ({
+    data: null,
+    error: new Error("Missing migration"),
+  });
+  await assert.rejects(
+    () =>
+      oldSchema.services.handle(
+        "/api/analyze",
+        { image_id: oldSchema.image },
+        oldSchema.ctx,
+      ),
+    (e) => e.status === 503,
+  );
+  assert.equal(oldSchema.calls.length, 0);
+});
+
+test("Gemini failures, blocked content, invalid schemas and truncated responses never create a mock or saved result", async () => {
+  for (const response of [
+    () => new Response("{}", { status: 429 }),
+    () => new Response("{}", { status: 503 }),
+    () => new Response("{}", { status: 403 }),
+    () => {
+      throw new Error("Connection failed");
+    },
+    () => Response.json({ promptFeedback: { blockReason: "SAFETY" } }),
+    () =>
+      Response.json({
+        candidates: [
+          { finishReason: "MAX_TOKENS", content: { parts: [{ text: "{}" }] } },
+        ],
+      }),
+    () =>
+      Response.json({
+        candidates: [
+          { finishReason: "STOP", content: { parts: [{ text: "not JSON" }] } },
+        ],
+      }),
+    () => geminiResponse({ ...geminiReport(), summary: "" }),
+    () => geminiResponse({ ...geminiReport(), image_kind: "not_oral_photo" }),
+    () => geminiResponse({ ...geminiReport(), score: 0.99 }),
+  ]) {
+    const h = harness(
+      { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "synthetic-key" },
+      response,
+    );
+    await assert.rejects(() =>
+      h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+    );
+    assert.equal(h.writes.filter((w) => w.table === "ai_analyses").length, 0);
+  }
+});
+
+test("Gemini retains unsuitable-image reports without invented oral findings and rechecks consent after inference", async () => {
+  const report = {
+    image_kind: "not_oral_photo",
+    summary: "A test pattern is not an oral photograph.",
+    visible_findings: [],
+    possible_conditions: [],
+    limitations: ["Upload an original educational oral photograph."],
+  };
+  const h = harness(
+    { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "synthetic-key" },
+    () => geminiResponse(report),
+  );
+  const result = await h.services.handle(
+    "/api/analyze",
+    { image_id: h.image },
+    h.ctx,
+  );
+  assert.equal(result.research_label, "not_an_oral_photo");
+  assert.equal(result.score, null);
+  const revoked = harness(
+    { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "synthetic-key" },
+    () => {
+      revoked.rows.consents[1].granted = false;
+      return geminiResponse();
+    },
+  );
+  await assert.rejects(
+    () =>
+      revoked.services.handle(
+        "/api/analyze",
+        { image_id: revoked.image },
+        revoked.ctx,
+      ),
+    (e) => e.status === 403,
+  );
+  assert.equal(
+    revoked.writes.filter((w) => w.table === "ai_analyses").length,
+    0,
+  );
+});
 test("video handler verifies consent, creates a private room and scopes expiring tokens", async () => {
   const h = harness();
   await assert.rejects(
     () => h.services.authenticate("invalid"),
     (e) => e.status === 401,
   );
-  const ctx = await h.services.authenticate("valid");
+  const ctx = await h.services.authenticate(h.validToken);
   const result = await h.services.handle(
     "/api/video",
     { appointment_id: h.appointment },

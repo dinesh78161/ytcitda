@@ -973,9 +973,14 @@ export function IntegrationStatus() {
                   "Mock demonstration · no prediction",
                   "మాక్ ప్రదర్శన · వైద్య అంచనా కాదు",
                 )
-              : w.services[key]
-                ? l("Configured", "అమర్చబడింది")
-                : l("Not configured", "అమర్చలేదు")}
+              : key === "ai" && w.services.ai_provider === "gemini"
+                ? l(
+                    "Google Gemini · image observations",
+                    "Google Gemini · చిత్ర పరిశీలనలు",
+                  )
+                : w.services[key]
+                  ? l("Configured", "అమర్చబడింది")
+                  : l("Not configured", "అమర్చలేదు")}
           </span>
         </div>
       ))}

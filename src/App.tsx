@@ -46,6 +46,7 @@ import {
 import { configurationError, isCloud, supabase } from "./lib/client";
 import { demoProfiles } from "./lib/demo";
 import { inspectImage } from "./lib/image-quality";
+import OralAnalysis from "./OralAnalysis";
 import { roleLabel, statusLabel, translator, type Label } from "./lib/i18n";
 import { message, useWorkspace } from "./lib/use-workspace";
 import type { Language, Page, Patient, Role } from "./lib/types";
@@ -1346,89 +1347,13 @@ function PatientDetail({
                   </label>
                 )}
                 {images.length === 0 && <Empty text={t("noPhotos")} />}
-                <div className="photo-grid">
+                <div className="photo-grid analysis-gallery">
                   {images.map((image) => (
-                    <article className="photo-card" key={image.id}>
-                      {image.preview && photoConsent ? (
-                        <img src={image.preview} alt={t("photos")} />
-                      ) : (
-                        <div className="photo-placeholder">
-                          <ShieldCheck />
-                          {t("protected")}
-                        </div>
-                      )}
-                      <div>
-                        <span
-                          className={`badge ${image.quality_status === "acceptable" ? "badge-completed" : "badge-missed"}`}
-                        >
-                          {t(
-                            image.quality_status === "acceptable"
-                              ? "acceptable"
-                              : "recapture",
-                          )}
-                        </span>
-                        <p className="small muted">
-                          {image.quality_details &&
-                            `Exposure ${image.quality_details.brightness} · Sharpness ${image.quality_details.sharpness}`}
-                        </p>
-                        {isCloud && (
-                          <button
-                            className="button subtle"
-                            disabled={!photoConsent}
-                            onClick={() =>
-                              void run(async () => {
-                                const file = await careApi<{ url: string }>(
-                                  "download",
-                                  { kind: "oral", id: image.id },
-                                );
-                                downloadUrl(file.url, "oral-photo.jpg");
-                              })
-                            }
-                          >
-                            {lang === "te"
-                              ? "చిత్రం డౌన్‌లోడ్"
-                              : "Download photo"}
-                          </button>
-                        )}
-                        {w.data.ai_analyses.some(
-                          (a) => a.image_id === image.id,
-                        ) ? (
-                          <div className="mock-result">
-                            {w.data.ai_analyses
-                              .filter((a) => a.image_id === image.id)
-                              .map((a) => (
-                                <p key={a.id}>
-                                  {a.provider === "mock"
-                                    ? t("mockResult")
-                                    : `${a.research_label} · ${a.model_version} · ${lang === "te" ? "పరిశోధన మాత్రమే; వైద్య సమీక్ష అవసరం" : "Research only; clinician review required"}`}
-                                </p>
-                              ))}
-                          </div>
-                        ) : (
-                          <button
-                            disabled={
-                              w.busy ||
-                              !photoConsent ||
-                              image.quality_status !== "acceptable" ||
-                              (isCloud && !w.services.ai)
-                            }
-                            className="button secondary"
-                            onClick={() =>
-                              void run(() =>
-                                w.execute("analyze", { image_id: image.id }),
-                              )
-                            }
-                          >
-                            <Sparkles size={15} />
-                            {isCloud && w.services.ai_provider !== "mock"
-                              ? lang === "te"
-                                ? "పరిశోధన విశ్లేషణ"
-                                : "Run research analysis"
-                              : t("analyze")}
-                          </button>
-                        )}
-                      </div>
-                    </article>
+                    <OralAnalysis
+                      key={image.id}
+                      image={image}
+                      consent={photoConsent}
+                    />
                   ))}
                 </div>
                 {isCloud && !w.services.ai && (

@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { createStaticHandler } from "./static.mjs";
 import { storePrivateUpload } from "./private-upload.mjs";
+import { analyzeWithGemini, GEMINI_DEFAULT_MODEL } from "./gemini.mjs";
 import { AccessToken, TrackSource } from "livekit-server-sdk";
 import {
   HttpError,
@@ -38,13 +39,14 @@ export function createServices(
   const aiMode =
     env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
   requireValue(
-    ["mock", "research", "disabled"].includes(aiMode),
+    ["mock", "research", "gemini", "disabled"].includes(aiMode),
     503,
-    "SCREENING_AI_MODE must be mock, research or disabled.",
+    "SCREENING_AI_MODE must be mock, research, gemini or disabled.",
   );
   const aiEnabled =
     configured &&
     (aiMode === "mock" ||
+      (aiMode === "gemini" && Boolean(env.GEMINI_API_KEY?.trim())) ||
       (aiMode === "research" &&
         !!(
           env.SCREENING_MODEL_URL &&
@@ -380,7 +382,7 @@ export function createServices(
       requireValue(
         status().ai,
         503,
-        "Image analysis is disabled or its research provider is not configured. Clinician review remains available.",
+        "Image analysis is disabled or its AI provider is not configured. Ask your workspace administrator to finish AI setup. Clinician review remains available.",
       );
       role(ctx, ["health_worker", "medical_officer", "specialist"]);
       requireValue(uuid(body.image_id), 400, "Invalid image ID.");
@@ -410,22 +412,40 @@ export function createServices(
           warning: "NOT FOR CLINICAL USE",
         };
       } else {
+        if (aiMode === "gemini") {
+          const capability = await ctx.user.rpc("image_findings_policy");
+          requireValue(
+            !capability.error && capability.data?.version === 1,
+            503,
+            "The image findings update is not available in this workspace yet. Ask your administrator to finish AI setup.",
+          );
+        }
         const blob = checked(
           await admin.storage.from("oral-images").download(image.object_key),
         );
-        const raw = await remote(
-          env.SCREENING_MODEL_URL,
-          env.SCREENING_MODEL_KEY,
-          {
-            image_base64: Buffer.from(await blob.arrayBuffer()).toString(
-              "base64",
-            ),
-            mime_type: "image/jpeg",
-            model_version: env.SCREENING_MODEL_VERSION,
-          },
-        );
-        result = validateModelResult(raw, env.SCREENING_MODEL_VERSION);
+        if (aiMode === "gemini") {
+          result = await analyzeWithGemini({
+            bytes: await blob.arrayBuffer(),
+            key: env.GEMINI_API_KEY,
+            model: env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
+            fetcher,
+          });
+        } else {
+          const raw = await remote(
+            env.SCREENING_MODEL_URL,
+            env.SCREENING_MODEL_KEY,
+            {
+              image_base64: Buffer.from(await blob.arrayBuffer()).toString(
+                "base64",
+              ),
+              mime_type: "image/jpeg",
+              model_version: env.SCREENING_MODEL_VERSION,
+            },
+          );
+          result = validateModelResult(raw, env.SCREENING_MODEL_VERSION);
+        }
       }
+      await patient(ctx, image.patient_id);
       await consent(ctx, image.patient_id, "image_capture");
       const saved = checked(
         await admin

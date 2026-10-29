@@ -59,6 +59,7 @@ export interface OralImage {
   created_at: string;
   preview?: string;
   quality_details?: Record<string, unknown>;
+  oral_view?: string;
 }
 export interface Analysis {
   id: string;
@@ -66,6 +67,16 @@ export interface Analysis {
   provider: string;
   model_version: string;
   research_label: string;
+  score?: number | null;
+  findings?: {
+    engine: "gemini";
+    prompt_version: string;
+    image_kind: "oral_photo" | "not_oral_photo" | "uncertain";
+    summary: string;
+    visible_findings: string[];
+    possible_conditions: { name: string; visual_basis: string }[];
+    limitations: string[];
+  } | null;
   status: string;
   clinical_use: false;
   requires_clinician_review: true;

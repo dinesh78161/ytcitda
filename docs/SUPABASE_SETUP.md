@@ -7,7 +7,7 @@ Keep its database password securely. These files assume a new project without
 existing application tables or Storage policies.
 
 For a new project, open [setup.sql](../supabase/setup.sql), copy the entire file into
-SQL Editor, and run it as `postgres`. It includes all five migrations and the facility
+SQL Editor, and run it as `postgres`. It includes all six migrations and the facility
 seed in one transaction. Run it once; it refuses to overwrite an existing application
 schema. Regenerate the file after migration changes with `npm run db:prepare`.
 
@@ -19,7 +19,8 @@ the combined setup file):
 3. [Authenticated workflow API](../supabase/migrations/202610260003_workflow_api.sql)
 4. [Care workflows and integration API](../supabase/migrations/202610270004_care_workflows.sql)
 5. [Patient journey, decisions and closure](../supabase/migrations/202610280005_patient_journey.sql)
-6. [Synthetic facilities](../supabase/seed.sql)
+6. [Structured image findings](../supabase/migrations/202610290008_image_findings.sql)
+7. [Synthetic facilities](../supabase/seed.sql)
 
 Apply only migrations that are not already applied. Migrations
 run once in transactions; seeds are repeatable. Keep `app_private` out of the Data
@@ -42,13 +43,13 @@ Under Authentication > Users, create and confirm these email/password accounts v
 the dashboard. For the demo, confirm accounts directly; sending verification or
 password-reset messages requires working mailboxes on this domain:
 
-| Email                      | Role                   |
-| -------------------------- | ---------------------- |
-| worker@aarohanytc.in        | Health worker          |
-| doctor@aarohanytc.in        | Medical Officer        |
-| specialist@aarohanytc.in    | Specialist             |
-| navigator@aarohanytc.in     | Navigator              |
-| admin@aarohanytc.in         | District administrator |
+| Email                    | Role                   |
+| ------------------------ | ---------------------- |
+| worker@aarohanytc.in     | Health worker          |
+| doctor@aarohanytc.in     | Medical Officer        |
+| specialist@aarohanytc.in | Specialist             |
+| navigator@aarohanytc.in  | Navigator              |
+| admin@aarohanytc.in      | District administrator |
 
 Choose passwords locally. None are embedded in the repository. Then run
 [demo_seed.sql](../supabase/demo_seed.sql). It maps the Auth IDs to active profiles

@@ -174,7 +174,11 @@ export function patientJourney(
       target: "photos",
       state: logistics
         ? "restricted"
-        : analyses.some((a) => a.provider === "research")
+        : analyses.some(
+              (a) =>
+                a.provider === "research" &&
+                (!a.findings || a.findings.image_kind === "oral_photo"),
+            )
           ? "complete"
           : analyses.length
             ? "recorded"
