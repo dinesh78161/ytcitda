@@ -1,7 +1,9 @@
+import { localeForLanguage } from "./lib/languages";
+import { localize } from "./lib/localize";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { CalendarDays, Download, FileText, Plus, Video } from "lucide-react";
 import { Badge, Field, Modal, useApp } from "./App";
-import { isCloud } from "./lib/client";
+import { isCloud, isClinical } from "./lib/client";
 import { hasConsent } from "./lib/care-workflows";
 import {
   careApi,
@@ -26,7 +28,7 @@ const today = () =>
   );
 function useWords() {
   const { lang } = useApp();
-  return (en: string, te: string) => (lang === "te" ? te : en);
+  return (en: string, te: string) => localize(lang, en, te);
 }
 
 export function ConsentPanel({ patient }: { patient: Patient }) {
@@ -83,6 +85,8 @@ export function ConsentPanel({ patient }: { patient: Patient }) {
 }
 
 export function PatientCare({ patient }: { patient: Patient }) {
+  const { lang } = useApp();
+
   const { w, run } = useApp(),
     l = useWords();
   const referrals = w.data.referrals.filter((r) => r.patient_id === patient.id),
@@ -168,8 +172,10 @@ export function PatientCare({ patient }: { patient: Patient }) {
               {referrals.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.specialty} ·{" "}
-                  {new Date(r.created_at).toLocaleDateString("en-IN")} ·{" "}
-                  {r.status}
+                  {new Date(r.created_at).toLocaleDateString(
+                    localeForLanguage(lang),
+                  )}{" "}
+                  · {r.status}
                 </option>
               ))}
             </select>
@@ -397,7 +403,9 @@ export function PatientCare({ patient }: { patient: Patient }) {
           {t.next_review_at && (
             <p className="muted">
               {l("Next review", "తదుపరి సమీక్ష")}:{" "}
-              {new Date(t.next_review_at).toLocaleString("en-IN")}
+              {new Date(t.next_review_at).toLocaleString(
+                localeForLanguage(lang),
+              )}
             </p>
           )}
           {w.data.treatment_events
@@ -405,8 +413,10 @@ export function PatientCare({ patient }: { patient: Patient }) {
             .map((e) => (
               <div className="treatment-event" key={e.id}>
                 <small>
-                  {new Date(e.created_at).toLocaleString("en-IN")} ·{" "}
-                  <Badge status={e.status} />
+                  {new Date(e.created_at).toLocaleString(
+                    localeForLanguage(lang),
+                  )}{" "}
+                  · <Badge status={e.status} />
                 </small>
                 <p>{e.notes}</p>
               </div>
@@ -523,8 +533,11 @@ export function PatientCare({ patient }: { patient: Patient }) {
               <span>
                 <strong>{d.name}</strong>
                 <small>
-                  {Math.ceil(d.size_bytes / 1024)} KB ·{" "}
-                  {new Date(d.created_at).toLocaleDateString("en-IN")}
+                  {Math.ceil(d.size_bytes / 1024)}
+                  {localize(lang, "KB ·")}{" "}
+                  {new Date(d.created_at).toLocaleDateString(
+                    localeForLanguage(lang),
+                  )}
                 </small>
               </span>
               <button
@@ -722,7 +735,7 @@ export function AppointmentTools({
             <iframe
               className="video-room"
               src={video.url}
-              title="Video consultation"
+              title={localize(lang, "Video consultation")}
               allow="camera; microphone; fullscreen; speaker-selection"
               referrerPolicy="no-referrer"
             />
@@ -739,7 +752,7 @@ export function AppointmentTools({
 }
 
 export function RemindersPanel() {
-  const { w, run } = useApp(),
+  const { w, run, lang } = useApp(),
     l = useWords();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -785,7 +798,9 @@ export function RemindersPanel() {
             <small>
               {Date.parse(r.due_at) <= now
                 ? l("Due now", "ఇప్పుడు చేయాలి")
-                : new Date(r.due_at).toLocaleString("en-IN")}{" "}
+                : new Date(r.due_at).toLocaleString(
+                    localeForLanguage(lang),
+                  )}{" "}
               · <Badge status={r.status} />
             </small>
           </span>
@@ -949,17 +964,17 @@ export function IntegrationStatus() {
     l = useWords();
   return (
     <section className="panel settings-card">
-      <h2>{l("Connected services", "అనుసంధాన సేవలు")}</h2>
+      <h2>{l("Clinical services status", "క్లినికల్ సేవల స్థితి")}</h2>
       <p className="small muted">
         {l(
-          "Live services require cloud mode and server configuration. Demo mode stores synthetic data on this device.",
-          "ప్రత్యక్ష సేవలకు క్లౌడ్ మోడ్ మరియు సర్వర్ అమరిక అవసరం. డెమో డేటా ఈ పరికరంలో ఉంటుంది.",
+          "Operational status for teleconsultation, patient records, and oral screening vision services.",
+          "టెలిమెడిసిన్, రోగి రికార్డులు మరియు నోటి స్క్రీనింగ్ సేవల స్థితి.",
         )}
       </p>
       {(
         [
-          ["database", "Database", "డేటాబేస్"],
-          ["files", "Private files", "వ్యక్తిగత ఫైళ్లు"],
+          ["database", "Clinical database", "క్లినికల్ డేటాబేస్"],
+          ["files", "Private file storage", "ప్రైవేట్ ఫైళ్ల నిల్వ"],
           ["video", "Video consultation", "వీడియో సంప్రదింపు"],
           ["ai", "Image analysis", "చిత్ర విశ్లేషణ"],
           ["reminders", "Reminder delivery", "రిమైండర్ పంపిణీ"],
@@ -968,19 +983,21 @@ export function IntegrationStatus() {
         <div className="consent-row" key={key}>
           <span>{l(en, te)}</span>
           <span className="badge">
-            {key === "ai" && w.services.ai_provider === "mock"
+            {key === "ai" && isClinical
               ? l(
-                  "Mock demonstration · no prediction",
-                  "మాక్ ప్రదర్శన · వైద్య అంచనా కాదు",
+                  "Not enabled for clinical use",
+                  "వైద్య వినియోగానికి ప్రారంభించలేదు",
                 )
-              : key === "ai" && w.services.ai_provider === "gemini"
-                ? l(
-                    "Google Gemini · image observations",
-                    "Google Gemini · చిత్ర పరిశీలనలు",
-                  )
-                : w.services[key]
-                  ? l("Configured", "అమర్చబడింది")
-                  : l("Not configured", "అమర్చలేదు")}
+              : key === "ai" && w.services.ai_provider === "mock"
+                ? l("Mock workflow test", "మాక్ వర్క్‌ఫ్లో పరీక్ష")
+                : key === "ai" && w.services.ai_provider === "gemini"
+                  ? l(
+                      "Google Gemini · Research only",
+                      "Google Gemini · పరిశోధన కోసం మాత్రమే",
+                    )
+                  : w.services[key]
+                    ? l("Configured", "అమర్చబడింది")
+                    : l("Not configured", "అమర్చలేదు")}
           </span>
         </div>
       ))}

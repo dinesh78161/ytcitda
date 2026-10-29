@@ -20,7 +20,7 @@ test("investigations, report downloads and treatment history survive reload", as
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("medical_officer");
   await patient(page);
   await page
@@ -128,7 +128,7 @@ test("outreach records update district totals without exposing patient records",
     page.getByText("Synthetic outreach village", { exact: true }),
   ).toBeVisible();
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("district_admin");
   await page
     .getByRole("navigation")
@@ -148,7 +148,9 @@ test("appointment rescheduling replaces reminders and calendar download works", 
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Demo role", { exact: true }).selectOption("navigator");
+  await page
+    .getByLabel("Training role selection", { exact: true })
+    .selectOption("navigator");
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Appointments", exact: true })

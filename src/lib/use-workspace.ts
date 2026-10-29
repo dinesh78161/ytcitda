@@ -4,10 +4,13 @@ import {
   fetchProfile,
   fetchWorkspace,
   isCloud,
+  isClinical,
+  verifyClinicalWorkspace,
   submitCloud,
   supabase,
 } from "./client";
 import { demoProfiles, summarize, visibleDemo } from "./demo";
+import { requiresSecondFactor } from "./security";
 import {
   careApi,
   serviceStatus,
@@ -34,6 +37,10 @@ import {
 } from "./types";
 
 export function useWorkspace() {
+  const sessionForm = useRef<unknown>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [authRevision, setAuthRevision] = useState(0);
+  const authGeneration = useRef(0);
   const [services, setServices] = useState<ServiceStatus>({
     database: false,
     files: false,
@@ -113,7 +120,7 @@ export function useWorkspace() {
         next.summary ??
           summarize(actor.role === "district_admin" ? next.data : visible),
       );
-      setDrafts(await listDrafts(actor.id, scope));
+      setDrafts(isClinical ? [] : await listDrafts(actor.id, scope));
       setError("");
     },
     [scope],
@@ -123,7 +130,14 @@ export function useWorkspace() {
     let sessionUserId: string | undefined;
     const enter = async (id?: string) => {
       sessionUserId = id;
+      const authVersion = ++authGeneration.current;
+      ++generation.current;
       setLoading(true);
+      setData(emptyData());
+      setSummary(summarize(emptyData()));
+      setDrafts([]);
+      sessionForm.current = null;
+      setMfaRequired(false);
       try {
         if (configurationError) throw new Error(configurationError);
         if (isCloud && !id) {
@@ -136,16 +150,36 @@ export function useWorkspace() {
           : (demoProfiles.find(
               (p) => p.role === localStorage.getItem("aarogya-demo-role"),
             ) ?? demoProfiles[0]);
-        if (!alive) return;
+        if (!alive || authVersion !== authGeneration.current) return;
+        if (isCloud) {
+          const assurance =
+            await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (assurance.error) throw assurance.error;
+          if (!alive || authVersion !== authGeneration.current) return;
+          if (
+            requiresSecondFactor(
+              actor.role,
+              assurance.data.currentLevel,
+              assurance.data.nextLevel,
+            )
+          ) {
+            setMfaRequired(true);
+            setProfile(actor);
+            return;
+          }
+        }
+        if (isCloud) await verifyClinicalWorkspace();
+        if (!alive || authVersion !== authGeneration.current) return;
         setProfile(actor);
         await refresh(actor);
       } catch (e) {
-        if (alive) {
+        if (alive && authVersion === authGeneration.current) {
           sessionUserId = undefined;
+          setProfile(null);
           setError(message(e));
         }
       } finally {
-        if (alive) setLoading(false);
+        if (alive && authVersion === authGeneration.current) setLoading(false);
       }
     };
     if (supabase) {
@@ -157,12 +191,21 @@ export function useWorkspace() {
       });
     } else void enter();
     const subscription = supabase?.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT")
+      if (
+        [
+          "SIGNED_IN",
+          "SIGNED_OUT",
+          "MFA_CHALLENGE_VERIFIED",
+          "TOKEN_REFRESHED",
+          "USER_UPDATED",
+        ].includes(event)
+      )
         setTimeout(() => {
           if (!alive) return;
           // Supabase repeats SIGNED_IN on tab focus for an existing session.
           // Keep the mounted patient form when the account has not changed.
-          if (event === "SIGNED_IN" && session?.user.id === sessionUserId) return;
+          if (event === "SIGNED_IN" && session?.user.id === sessionUserId)
+            return;
           void enter(session?.user.id);
         }, 0);
     });
@@ -176,7 +219,7 @@ export function useWorkspace() {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
     };
-  }, [refresh]);
+  }, [refresh, authRevision]);
 
   const execute = useCallback(
     async (
@@ -185,6 +228,7 @@ export function useWorkspace() {
       retryId?: string,
     ) => {
       if (!profile) throw new Error("Sign in first.");
+      if (mfaRequired) throw new Error("Verify your authenticator code first.");
       if (lock.current) throw new Error("Please wait for the current action.");
       lock.current = true;
       setBusy(true);
@@ -200,7 +244,11 @@ export function useWorkspace() {
         created_at: new Date().toISOString(),
       };
       try {
-        if (action === "register") {
+        if (isClinical && !navigator.onLine)
+          throw new Error(
+            "Reconnect before saving clinical records. This form is kept only for the current session.",
+          );
+        if (action === "register" && !isClinical) {
           await queueDraft(
             {
               id: command.id,
@@ -241,7 +289,7 @@ export function useWorkspace() {
         await refresh(profile);
         return "saved" as const;
       } catch (e) {
-        if (action === "register") {
+        if (action === "register" && !isClinical) {
           await queueDraft(
             {
               id: command.id,
@@ -261,11 +309,12 @@ export function useWorkspace() {
         setBusy(false);
       }
     },
-    [profile, refresh, scope],
+    [profile, refresh, scope, mfaRequired],
   );
 
   const sync = useCallback(async () => {
-    if (!profile || syncing.current || !navigator.onLine) return;
+    if (isClinical) return;
+    if (!profile || mfaRequired || syncing.current || !navigator.onLine) return;
     syncing.current = true;
     let failure = "";
     try {
@@ -281,16 +330,19 @@ export function useWorkspace() {
       syncing.current = false;
     }
     if (failure) throw new Error(failure);
-  }, [profile, scope, execute]);
+  }, [profile, scope, execute, mfaRequired]);
   useEffect(() => {
-    if (online && profile) void sync().catch((e) => setError(message(e)));
-  }, [online, profile?.id]); // Retry only on reconnect/session change.
+    if (online && profile && !mfaRequired)
+      void sync().catch((e) => setError(message(e)));
+  }, [online, profile?.id, mfaRequired]); // Retry only on reconnect/session change.
   return {
     services,
     refreshServices,
     checkingServices,
     servicesError,
     profile,
+    mfaRequired,
+    completeMfa: () => setAuthRevision((value) => value + 1),
     data,
     summary,
     loading,
@@ -303,7 +355,7 @@ export function useWorkspace() {
     execute,
     sync,
     refresh: async () => {
-      if (profile) await refresh(profile);
+      if (profile && !mfaRequired) await refresh(profile);
     },
     changeRole: async (role: Role) => {
       if (isCloud || busy) return;
@@ -321,15 +373,25 @@ export function useWorkspace() {
     signOut: async () => {
       await supabase?.auth.signOut();
       setProfile(null);
+      setMfaRequired(false);
       setData(emptyData());
+      sessionForm.current = null;
     },
     saveForm: async (value: unknown) => {
+      if (isClinical) {
+        sessionForm.current = value;
+        return;
+      }
       if (profile) await setLocal(`form:${scope}:${profile.id}`, value);
     },
     loadForm: async () =>
-      profile
-        ? await getLocal<Record<string, unknown>>(`form:${scope}:${profile.id}`)
-        : undefined,
+      isClinical
+        ? (sessionForm.current as Record<string, unknown> | undefined)
+        : profile
+          ? await getLocal<Record<string, unknown>>(
+              `form:${scope}:${profile.id}`,
+            )
+          : undefined,
   };
 }
 export const message = (error: unknown) =>

@@ -1,8 +1,10 @@
+import { localize } from "./lib/localize";
+import { localeForLanguage } from "./lib/languages";
 import { useState } from "react";
 import { ArrowRight, Check, ClipboardCheck, ShieldCheck } from "lucide-react";
 import { Badge, Field, useApp } from "./App";
 import { AppointmentTools } from "./CarePanels";
-import { isCloud } from "./lib/client";
+import { isCloud, isClinical } from "./lib/client";
 import {
   caseRecords,
   closureBlockers,
@@ -18,7 +20,7 @@ const titles: Record<string, [string, string]> = {
   registration: ["Register patient", "రోగి నమోదు"],
   photos: ["Take oral photos", "నోటి చిత్రాలు"],
   quality: ["Image quality check", "చిత్ర నాణ్యత"],
-  analysis: ["Experimental AI", "పరిశోధన AI"],
+  analysis: ["Research AI (optional)", "పరిశోధన AI (ఐచ్ఛికం)"],
   review: ["Officer review / referral", "వైద్య సమీక్ష / సిఫార్సు"],
   consultation: ["Consultation", "సంప్రదింపు"],
   diagnostics: ["Biopsy / histopathology", "బయాప్సీ / పాథాలజీ"],
@@ -72,7 +74,6 @@ export function GuidedJourney({
   onNavigate: (target: JourneyTarget) => void;
 }) {
   const { w, lang } = useApp(),
-    index = lang === "te" ? 1 : 0,
     clinical = ["medical_officer", "specialist"].includes(w.profile!.role);
   const steps = patientJourney(
       w.data,
@@ -80,7 +81,7 @@ export function GuidedJourney({
       w.profile!.role,
       isCloud,
       w.services.ai,
-    ),
+    ).filter((step) => !isClinical || step.id !== "analysis"),
     c = caseRecords(w.data, patient.id);
   const next = steps.find(
     (s) =>
@@ -91,19 +92,23 @@ export function GuidedJourney({
   return (
     <section
       className="panel patient-journey"
-      aria-label={
-        lang === "te" ? "రోగి సంరక్షణ ప్రయాణం" : "Patient care journey"
-      }
+      aria-label={localize(
+        lang,
+        "Patient care journey",
+        "రోగి సంరక్షణ ప్రయాణం",
+      )}
     >
       <div className="journey-heading">
         <div>
           <span className="eyebrow">
-            {lang === "te" ? "ప్రధాన రోగి ప్రక్రియ" : "CORE PATIENT WORKFLOW"}
+            {localize(lang, "CORE PATIENT WORKFLOW", "ప్రధాన రోగి ప్రక్రియ")}
           </span>
           <h2>
-            {lang === "te"
-              ? "నమోదు నుండి తదుపరి సంరక్షణ వరకు"
-              : "From registration to continuing care"}
+            {localize(
+              lang,
+              "From registration to continuing care",
+              "నమోదు నుండి తదుపరి సంరక్షణ వరకు",
+            )}
           </h2>
         </div>
         {c.screening && <Badge status={c.screening.status} />}
@@ -119,13 +124,21 @@ export function GuidedJourney({
               <span className="journey-number">
                 {step.state === "complete" ? <Check size={16} /> : i + 1}
               </span>
-              <strong>{titles[step.id][index]}</strong>
+              <strong>
+                {localize(lang, titles[step.id][0], titles[step.id][1])}
+              </strong>
               <span className="journey-state">
                 {step.id === "analysis" && step.state === "recorded"
-                  ? lang === "te"
-                    ? "మాక్ ఫలితం"
-                    : "Mock result recorded"
-                  : stateLabels[step.state][index]}
+                  ? localize(
+                      lang,
+                      "AI assessment recorded",
+                      "AI పరిశీలనలు నమోదయ్యాయి",
+                    )
+                  : localize(
+                      lang,
+                      stateLabels[step.state][0],
+                      stateLabels[step.state][1],
+                    )}
               </span>
             </button>
           </li>
@@ -134,20 +147,24 @@ export function GuidedJourney({
       <div className="journey-next">
         <p>
           {c.screening?.status === "closed"
-            ? lang === "te"
-              ? "కేసు ముగిసింది. చరిత్ర భద్రపరచబడింది."
-              : "Case closed. The complete history is retained."
-            : lang === "te"
-              ? "AI ఐచ్ఛికం. వైద్య సమీక్షను కొనసాగించవచ్చు. అవసరాన్ని బట్టి పరీక్షలు, చికిత్సను వైద్యుడు నిర్ణయిస్తారు."
-              : "AI is optional and does not block clinician review. The clinician records whether diagnostics and treatment are needed."}
+            ? localize(
+                lang,
+                "Case closed. The complete history is retained.",
+                "కేసు ముగిసింది. చరిత్ర భద్రపరచబడింది.",
+              )
+            : localize(
+                lang,
+                "AI is optional and does not block clinician review. The clinician records whether diagnostics and treatment are needed.",
+                "AI ఐచ్ఛికం. వైద్య సమీక్షను కొనసాగించవచ్చు. అవసరాన్ని బట్టి పరీక్షలు, చికిత్సను వైద్యుడు నిర్ణయిస్తారు.",
+              )}
         </p>
         {next && c.screening?.status !== "closed" && (
           <button
             className="button secondary"
             onClick={() => onNavigate(next.target)}
           >
-            {lang === "te" ? "తదుపరి చర్య" : "Next action"}:{" "}
-            {titles[next.id][index]}
+            {localize(lang, "Next action", "తదుపరి చర్య")}:{" "}
+            {localize(lang, titles[next.id][0], titles[next.id][1])}
             <ArrowRight size={16} />
           </button>
         )}
@@ -158,7 +175,7 @@ export function GuidedJourney({
 
 export function CaseDecisions({ patient }: { patient: Patient }) {
   const { w, lang, run } = useApp(),
-    l = (en: string, te: string) => (lang === "te" ? te : en);
+    l = (en: string, te: string) => localize(lang, en, te);
   const c = caseRecords(w.data, patient.id),
     closed = c.screening?.status === "closed",
     blockers = closureBlockers(w.data, patient.id);
@@ -187,7 +204,9 @@ export function CaseDecisions({ patient }: { patient: Patient }) {
           <strong>{l("Before closing this case", "కేసు ముగించే ముందు")}</strong>
           <ul>
             {blockers.map((reason) => (
-              <li key={reason}>{reasons[reason][lang === "te" ? 1 : 0]}</li>
+              <li key={reason}>
+                {localize(lang, reasons[reason][0], reasons[reason][1])}
+              </li>
             ))}
           </ul>
         </div>
@@ -289,11 +308,10 @@ export function CaseDecisions({ patient }: { patient: Patient }) {
           </strong>
           <p>{d.notes}</p>
           <small>
-            {new Date(d.created_at).toLocaleString(
-              lang === "te" ? "te-IN" : "en-IN",
-              { timeZone: "Asia/Kolkata" },
-            )}{" "}
-            IST
+            {new Date(d.created_at).toLocaleString(localeForLanguage(lang), {
+              timeZone: "Asia/Kolkata",
+            })}{" "}
+            {localize(lang, "IST")}
           </small>
         </article>
       ))}
@@ -309,7 +327,7 @@ export function PatientAppointments({
   onBook: () => void;
 }) {
   const { w, run, lang } = useApp(),
-    l = (en: string, te: string) => (lang === "te" ? te : en),
+    l = (en: string, te: string) => localize(lang, en, te),
     c = caseRecords(w.data, patient.id),
     canEdit = ["medical_officer", "specialist", "navigator"].includes(
       w.profile!.role,
@@ -349,11 +367,10 @@ export function PatientAppointments({
               : l("In-person consultation", "ప్రత్యక్ష సంప్రదింపు")}
           </h3>
           <p>
-            {new Date(a.starts_at).toLocaleString(
-              lang === "te" ? "te-IN" : "en-IN",
-              { timeZone: "Asia/Kolkata" },
-            )}{" "}
-            IST
+            {new Date(a.starts_at).toLocaleString(localeForLanguage(lang), {
+              timeZone: "Asia/Kolkata",
+            })}{" "}
+            {localize(lang, "IST")}
           </p>
           {a.mode === "video" && (!isCloud || !w.services.video) && (
             <p className="small muted">
@@ -410,11 +427,10 @@ export function PatientAppointments({
           <Badge status={task.status} />
           <h4>{statusLabel(task.task_type, lang)}</h4>
           <p>
-            {new Date(task.due_at).toLocaleString(
-              lang === "te" ? "te-IN" : "en-IN",
-              { timeZone: "Asia/Kolkata" },
-            )}{" "}
-            IST
+            {new Date(task.due_at).toLocaleString(localeForLanguage(lang), {
+              timeZone: "Asia/Kolkata",
+            })}{" "}
+            {localize(lang, "IST")}
           </p>
           {canEdit && task.status === "pending" && (
             <div className="care-actions">
@@ -448,12 +464,14 @@ export function JourneyMetrics() {
     <section className="panel care-panel">
       <h2>
         <ClipboardCheck size={20} />{" "}
-        {lang === "te" ? "రోగుల సంరక్షణ దశలు" : "Patient workflow stages"}
+        {localize(lang, "Patient workflow stages", "రోగుల సంరక్షణ దశలు")}
       </h2>
       <p className="small muted">
-        {lang === "te"
-          ? "నమోదైన సంరక్షణ ఆధారంగా ప్రస్తుత దశలు. గుర్తింపు వివరాలు ప్రదర్శించబడవు."
-          : "Current stages derived from recorded care. District totals contain no patient identifiers."}
+        {localize(
+          lang,
+          "Current stages derived from recorded care. District totals contain no patient identifiers.",
+          "నమోదైన సంరక్షణ ఆధారంగా ప్రస్తుత దశలు. గుర్తింపు వివరాలు ప్రదర్శించబడవు.",
+        )}
       </p>
       <div className="stage-distribution">
         {stages.map((stage) => (

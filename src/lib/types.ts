@@ -4,7 +4,8 @@ export type Role =
   | "specialist"
   | "navigator"
   | "district_admin";
-export type Language = "en" | "te";
+import type { Language } from "./languages";
+export type { Language } from "./languages";
 export type Page =
   | "overview"
   | "patients"
@@ -48,6 +49,7 @@ export interface Consent {
   patient_id: string;
   purpose: string;
   granted: boolean;
+  language?: Language;
   recorded_at: string;
 }
 export interface OralImage {
@@ -58,7 +60,14 @@ export interface OralImage {
   object_key: string;
   created_at: string;
   preview?: string;
-  quality_details?: Record<string, unknown>;
+  quality_details?: {
+    sharpness?: number;
+    brightness?: number;
+    glare_percent?: number;
+    method?: string;
+    medgemma?: import("./image-quality").MedGemmaQualityAssessment;
+    [key: string]: unknown;
+  };
   oral_view?: string;
 }
 export interface Analysis {
@@ -69,7 +78,8 @@ export interface Analysis {
   research_label: string;
   score?: number | null;
   findings?: {
-    engine: "gemini";
+    engine: "gemini" | "medgemma";
+    language?: Language;
     prompt_version: string;
     image_kind: "oral_photo" | "not_oral_photo" | "uncertain";
     summary: string;

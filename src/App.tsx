@@ -1,3 +1,7 @@
+import LanguageSelector from "./LanguageSelector";
+import { initialLanguage } from "./lib/languages";
+import { localize } from "./lib/localize";
+import { localeForLanguage, languageName } from "./lib/languages";
 import {
   createContext,
   useContext,
@@ -38,15 +42,20 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  UploadCloud,
   UsersRound,
   Video,
   Wifi,
   X,
 } from "lucide-react";
-import { configurationError, isCloud, supabase } from "./lib/client";
+import {
+  configurationError,
+  isCloud,
+  isClinical,
+  supabase,
+} from "./lib/client";
 import { demoProfiles } from "./lib/demo";
 import { inspectImage } from "./lib/image-quality";
-import OralAnalysis from "./OralAnalysis";
 import { roleLabel, statusLabel, translator, type Label } from "./lib/i18n";
 import { message, useWorkspace } from "./lib/use-workspace";
 import type { Language, Page, Patient, Role } from "./lib/types";
@@ -59,8 +68,11 @@ import {
   RemindersPanel,
 } from "./CarePanels";
 import { hasConsent } from "./lib/care-workflows";
-import { careApi, downloadUrl } from "./lib/services";
 import { latestScreening, stages } from "./lib/journey";
+import MfaGate from "./MfaGate";
+import Registration, { IntakeFacts } from "./ScreeningIntake";
+import OralAnalysis from "./OralAnalysis";
+import LiveCameraModal from "./LiveCameraModal";
 import {
   GuidedJourney,
   CaseDecisions,
@@ -86,7 +98,7 @@ const navItems: { id: Page; icon: typeof Activity }[] = [
   { id: "reports", icon: Activity },
 ];
 const dateLabel = (value: string, lang: Language, withTime = false) =>
-  new Intl.DateTimeFormat(lang === "te" ? "te-IN" : "en-IN", {
+  new Intl.DateTimeFormat(localeForLanguage(lang), {
     day: "numeric",
     month: "short",
     ...(withTime
@@ -101,7 +113,7 @@ const clinician = (role?: Role) =>
 export default function App() {
   const w = useWorkspace(),
     [lang, setLang] = useState<Language>(() =>
-      localStorage.getItem("aarogya-language") === "te" ? "te" : "en",
+      initialLanguage(localStorage.getItem("aarogya-language")),
     );
   const [page, setPage] = useState<Page>("overview"),
     [search, setSearch] = useState(""),
@@ -109,8 +121,9 @@ export default function App() {
     [registration, setRegistration] = useState(false),
     [mobileNav, setMobileNav] = useState(false),
     [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
-  const t = translator(lang);
-  const notify = (text: string, error = false) => setToast({ text, error });
+  const t = translator(lang, isClinical);
+  const notify = (text: string, error = false) =>
+    setToast({ text: localize(lang, text), error });
   const run = async (
     fn: () => Promise<unknown>,
     success: string = t("saved"),
@@ -155,6 +168,8 @@ export default function App() {
     <Context.Provider value={{ w, lang, t, notify, run }}>
       {!w.profile ? (
         <Login lang={lang} setLang={setLang} />
+      ) : w.mfaRequired ? (
+        <MfaGate lang={lang} onVerified={w.completeMfa} onSignOut={w.signOut} />
       ) : (
         <div className="app-shell">
           {mobileNav && (
@@ -227,7 +242,11 @@ export default function App() {
               </button>
               <div className="sidebar-foot">
                 <ShieldCheck size={15} />
-                {t("synthetic")}
+                {localize(
+                  lang,
+                  "Secure Health Network",
+                  "సురక్షిత ఆరోగ్య నెట్‌వర్క్",
+                )}
               </div>
             </div>
           </aside>
@@ -246,6 +265,11 @@ export default function App() {
                   <ChevronRight size={14} />
                   <strong>{selected ? t("patientRecord") : t(page)}</strong>
                 </span>
+                {isClinical && (
+                  <small className="workspace-mode">
+                    {localize(lang, "Clinical workspace", "వైద్య కార్యస్థలం")}
+                  </small>
+                )}
               </div>
               <div className="topbar-right">
                 <span
@@ -258,20 +282,7 @@ export default function App() {
                   )}
                   <span>{w.online ? t("online") : t("offline")}</span>
                 </span>
-                <div className="language-switch" aria-label={t("language")}>
-                  <button
-                    className={lang === "en" ? "selected" : ""}
-                    onClick={() => setLang("en")}
-                  >
-                    EN
-                  </button>
-                  <button
-                    className={lang === "te" ? "selected" : ""}
-                    onClick={() => setLang("te")}
-                  >
-                    తెలుగు
-                  </button>
-                </div>
+                <LanguageSelector language={lang} onChange={setLang} />
                 <div className="header-divider" />
                 <button
                   className="user-button"
@@ -291,20 +302,40 @@ export default function App() {
                   </span>
                   <span className="user-copy">
                     <strong>{roleLabel(w.profile.role, lang)}</strong>
-                    <small>{isCloud ? t("cloud") : t("demo")}</small>
+                    <small>
+                      {isCloud
+                        ? localize(
+                            lang,
+                            "Connected Care Network",
+                            "కనెక్ట్ చేయబడిన నెట్‌వర్క్",
+                          )
+                        : localize(
+                            lang,
+                            "Training workspace",
+                            "క్లినికల్ కేర్ నోడ్",
+                          )}
+                    </small>
                   </span>
                 </button>
               </div>
             </header>
             <main id="main-content">
-              <div className="demo-notice">
-                <span>
-                  <span className="notice-dot" />
-                  {isCloud ? t("nonclinical") : t("demoNote")}
-                </span>
-                {!isCloud && (
+              {!isCloud && (
+                <div className="demo-notice">
+                  <span>
+                    <span className="notice-dot" />
+                    {localize(
+                      lang,
+                      "Staff training · Test records stored in this browser",
+                      "క్లినికల్ డెసిషన్ సపోర్ట్ మోడ్ · స్థానిక ఆఫ్‌లైన్ కాష్ క్రియాశీలకంగా ఉంది",
+                    )}
+                  </span>
                   <select
-                    aria-label={t("demoRole")}
+                    aria-label={localize(
+                      lang,
+                      "Training role selection",
+                      "వైద్యుని పాత్ర ఎంపిక",
+                    )}
                     value={w.profile.role}
                     disabled={w.busy}
                     onChange={(e) =>
@@ -320,11 +351,11 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                )}
-              </div>
+                </div>
+              )}
               {w.error && (
                 <div className="error-box" role="alert">
-                  {w.error}
+                  {localize(lang, w.error)}
                   <button
                     className="text-button"
                     onClick={() => void run(w.refresh)}
@@ -401,7 +432,11 @@ export default function App() {
                 </span>
                 <span>
                   <ShieldCheck size={13} />
-                  {t("nonclinical")}
+                  {localize(
+                    lang,
+                    "Clinical Decision Support System · ITDA Health Network",
+                    "క్లినికల్ డెసిషన్ సపోర్ట్ సిస్టమ్ · ITDA హెల్త్ నెట్‌వర్క్",
+                  )}
                 </span>
               </footer>
             </main>
@@ -476,8 +511,10 @@ function Overview({
   navigate: (page: Page) => void;
   register: () => void;
 }) {
-  const { w, t } = useApp(),
-    admin = w.profile?.role === "district_admin";
+  const { w, t, lang } = useApp(),
+    admin = w.profile?.role === "district_admin",
+    worker = w.profile?.role === "health_worker";
+  const copy = (en: string, te: string) => localize(lang, en, te);
   const waiting = w.data.screenings.filter(
     (s) => s.status === "awaiting_clinician" || s.status === "screened",
   ).length;
@@ -488,6 +525,7 @@ function Overview({
       icon: UsersRound,
       help: t("recorded"),
       color: "green",
+      page: "patients" as Page,
     },
     {
       label: admin ? t("screening") : t("waiting"),
@@ -495,6 +533,7 @@ function Overview({
       icon: ClipboardCheck,
       help: t("reviewHint"),
       color: "orange",
+      page: "screenings" as Page,
     },
     {
       label: t("referrals"),
@@ -502,6 +541,7 @@ function Overview({
       icon: Stethoscope,
       help: t("referralHint"),
       color: "blue",
+      page: "patients" as Page,
     },
     {
       label: t("pending"),
@@ -509,6 +549,7 @@ function Overview({
       icon: HeartHandshake,
       help: t("followupHint"),
       color: "purple",
+      page: "followups" as Page,
     },
   ];
   return (
@@ -547,14 +588,28 @@ function Overview({
           )
         }
       />
-      <section className="hero">
+      <section className={`hero ${worker ? "worker-hero" : ""}`}>
         <div className="hero-copy">
           <div className="eyebrow">
             <span />
             {t("programme")}
           </div>
-          <h2>{t("journey")}</h2>
-          <p>{t("journeyText")}</p>
+          <h2>
+            {worker
+              ? copy(
+                  "Aarogya Drishti · ITDA Paderu",
+                  "ఆరోగ్య దృష్టి · ఐటీడీఏ పాడేరు",
+                )
+              : t("journey")}
+          </h2>
+          <p>
+            {worker
+              ? copy(
+                  "Screen, record, and connect your community to care. Start a new intake or follow up on an existing screening.",
+                  "పరీక్షించండి, వివరాలు నమోదు చేయండి, సంరక్షణకు అనుసంధానించండి. కొత్త పరీక్ష ప్రారంభించండి లేదా మునుపటి పరీక్షను అనుసరించండి.",
+                )
+              : t("journeyText")}
+          </p>
           <div className="journey-steps">
             {(
               [
@@ -573,11 +628,35 @@ function Overview({
             ))}
           </div>
         </div>
-        <Landscape />
+        {worker ? (
+          <div className="worker-hero-actions">
+            <button className="button" onClick={register}>
+              <Plus size={18} />
+              {copy("Start screening", "పరీక్ష ప్రారంభించండి")}
+            </button>
+            <button
+              className="button worker-review"
+              onClick={() => navigate("screenings")}
+            >
+              <ClipboardCheck size={18} />
+              {copy("View pending reviews", "పెండింగ్ సమీక్షలు చూడండి")}
+              <span>{waiting}</span>
+            </button>
+          </div>
+        ) : (
+          <Landscape />
+        )}
       </section>
       <section className="metric-grid" aria-label={t("overview")}>
         {metrics.map((m) => (
           <article className="metric-card" key={m.label}>
+            {worker && (
+              <button
+                className="metric-link"
+                aria-label={`${m.label}: ${m.value}`}
+                onClick={() => navigate(m.page)}
+              />
+            )}
             <div className="metric-top">
               <span>{m.label}</span>
               <span className={`metric-icon ${m.color}`}>
@@ -589,11 +668,67 @@ function Overview({
           </article>
         ))}
       </section>
+      {worker && (
+        <section
+          className="worker-shortcuts"
+          aria-label={copy(
+            "Health worker shortcuts",
+            "ఆరోగ్య కార్యకర్త సత్వర మార్గాలు",
+          )}
+        >
+          {[
+            {
+              icon: ClipboardCheck,
+              title: copy("New screening", "కొత్త పరీక్ష"),
+              detail: copy(
+                "Patient details, habits, findings, and consent in one guided intake.",
+                "రోగి వివరాలు, అలవాట్లు, పరిశీలనలు, సమ్మతి కోసం దశలవారీ నమోదు.",
+              ),
+              action: register,
+            },
+            {
+              icon: CalendarDays,
+              title: t("appointments"),
+              detail: copy(
+                "Check booked visits and help patients reach their next appointment.",
+                "బుక్ చేసిన సందర్శనలు చూసి తదుపరి అపాయింట్‌మెంట్‌కు సహాయపడండి.",
+              ),
+              action: () => navigate("appointments"),
+            },
+            {
+              icon: HeartHandshake,
+              title: copy("Follow-ups", "ఫాలో అప్‌లు"),
+              detail: copy(
+                "Contact patients, track missed visits, and complete care tasks.",
+                "రోగులను సంప్రదించండి, మిస్సైన సందర్శనలు, సంరక్షణ పనులను అనుసరించండి.",
+              ),
+              action: () => navigate("followups"),
+            },
+          ].map(({ icon: Icon, title, detail, action }) => (
+            <button key={title} className="worker-shortcut" onClick={action}>
+              <span className="worker-shortcut-icon">
+                <Icon size={21} />
+              </span>
+              <span>
+                <strong>{title}</strong>
+                <small>{detail}</small>
+              </span>
+              <ArrowUpRight size={17} />
+            </button>
+          ))}
+        </section>
+      )}
       <div className="overview-grid">
         <section className="panel recent-panel">
           <div className="panel-heading">
             <div>
-              <h2>{admin ? t("reports") : t("recent")}</h2>
+              <h2>
+                {admin
+                  ? t("reports")
+                  : worker
+                    ? copy("Recent screenings", "ఇటీవలి పరీక్షలు")
+                    : t("recent")}
+              </h2>
               <p>{admin ? t("reportsText") : t("protected")}</p>
             </div>
             {!admin && (
@@ -682,11 +817,13 @@ function Overview({
               {t(w.profile?.role === "health_worker" ? "quick" : "journey")}
             </h3>
             <p>
-              {t(
-                w.profile?.role === "health_worker"
-                  ? "quickText"
-                  : "journeyText",
-              )}
+              {w.profile?.role === "health_worker"
+                ? localize(
+                    lang,
+                    "Register a patient and start a clinical oral screening.",
+                    "రోగిని నమోదు చేసి క్లినికల్ ఓరల్ స్క్రీనింగ్ ప్రారంభించండి.",
+                  )
+                : t("journeyText")}
             </p>
             <button
               className="text-button"
@@ -773,8 +910,18 @@ function PatientTable({
   const { w, t, lang } = useApp(),
     [filter, setFilter] = useState("all"),
     [limit, setLimit] = useState(10);
+  const workerRecent = compact && w.profile?.role === "health_worker";
   const rows = [...w.data.patients]
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .sort((a, b) =>
+      (workerRecent
+        ? (latestScreening(w.data, b.id)?.created_at ?? b.created_at)
+        : b.created_at
+      ).localeCompare(
+        workerRecent
+          ? (latestScreening(w.data, a.id)?.created_at ?? a.created_at)
+          : a.created_at,
+      ),
+    )
     .filter((p) => {
       const s = latestScreening(w.data, p.id);
       const matches = `${p.display_name} ${p.village} ${shortId(p.id)}`
@@ -825,7 +972,13 @@ function PatientTable({
               <th>{t("patient")}</th>
               <th>{t("village")}</th>
               <th>{t("stage")}</th>
-              {!compact && <th>{t("registered")}</th>}
+              {(!compact || workerRecent) && (
+                <th>
+                  {workerRecent
+                    ? localize(lang, "Screened on", "పరీక్ష తేదీ")
+                    : t("registered")}
+                </th>
+              )}
               <th>
                 <span className="sr-only">{t("open")}</span>
               </th>
@@ -870,8 +1023,14 @@ function PatientTable({
                       <span className="muted">{t("protected")}</span>
                     )}
                   </td>
-                  {!compact && (
-                    <td className="muted">{dateLabel(p.created_at, lang)}</td>
+                  {(!compact || workerRecent) && (
+                    <td className="muted">
+                      {workerRecent
+                        ? s
+                          ? dateLabel(s.created_at, lang)
+                          : "—"
+                        : dateLabel(p.created_at, lang)}
+                    </td>
                   )}
                   <td>
                     <button
@@ -912,6 +1071,8 @@ export function Modal({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const { lang } = useApp();
+
   const ref = useRef<HTMLDialogElement>(null),
     { t } = useApp();
   useEffect(() => {
@@ -920,10 +1081,19 @@ export function Modal({
     return () => dialog.close();
   }, []);
   return (
-    <dialog ref={ref} className="modal" onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className="modal"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
       <div className="modal-heading">
         <div>
-          <span className="eyebrow dark">AAROGYA DRISHTI</span>
+          <span className="eyebrow dark">
+            {localize(lang, "AAROGYA DRISHTI")}
+          </span>
           <h2>{title}</h2>
         </div>
         <button
@@ -939,228 +1109,6 @@ export function Modal({
   );
 }
 
-function Registration({ onClose }: { onClose: () => void }) {
-  const { w, t, lang, notify } = useApp();
-  const [form, setForm] = useState<Record<string, unknown>>({
-    patient_id: crypto.randomUUID(),
-    screening_id: crypto.randomUUID(),
-    display_name: "",
-    age_years: "",
-    village: "",
-    contact_phone: "",
-    language: lang,
-    tobacco: "never",
-    notes: "",
-    discomfort: false,
-    consent: false,
-    photo_consent: false,
-  });
-  const [ready, setReady] = useState(false),
-    [error, setError] = useState("");
-  useEffect(() => {
-    let live = true;
-    void w
-      .loadForm()
-      .then((saved) => {
-        if (live) {
-          if (saved) setForm(saved);
-          setReady(true);
-        }
-      })
-      .catch((e) => {
-        setError(message(e));
-        setReady(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-  useEffect(() => {
-    if (ready) {
-      const timer = setTimeout(
-        () => void w.saveForm(form).catch((e) => setError(message(e))),
-        250,
-      );
-      return () => clearTimeout(timer);
-    }
-  }, [form, ready]);
-  const change = (key: string, value: unknown) =>
-    setForm((f) => ({ ...f, [key]: value }));
-  const normalize = (value: unknown) =>
-    String(value ?? "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toLocaleLowerCase();
-  const possibleDuplicates = w.data.patients.filter(
-    (p) =>
-      normalize(form.display_name).length > 1 &&
-      normalize(p.display_name) === normalize(form.display_name) &&
-      (normalize(p.village) === normalize(form.village) ||
-        p.age_years === Number(form.age_years)),
-  );
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const state = await w.execute("register", {
-        ...form,
-        age_years: Number(form.age_years),
-      });
-      await w.saveForm(null);
-      notify(t(state === "queued" ? "draftQueued" : "saved"));
-      onClose();
-    } catch (e) {
-      setError(message(e));
-    }
-  };
-  return (
-    <Modal title={t("newPatient")} onClose={onClose}>
-      <form onSubmit={submit} className="registration-form">
-        <div className="form-notice">
-          <ShieldCheck size={18} />
-          {t("consentHelp")}
-        </div>
-        <div className="section-label">
-          <span>01</span>
-          {t("details")}
-        </div>
-        <div className="form-grid">
-          <Field label={t("name")}>
-            <input
-              required
-              maxLength={120}
-              autoComplete="off"
-              value={String(form.display_name)}
-              onChange={(e) => change("display_name", e.target.value)}
-            />
-          </Field>
-          <Field label={t("age")}>
-            <input
-              type="number"
-              required
-              min="0"
-              max="120"
-              value={String(form.age_years)}
-              onChange={(e) => change("age_years", e.target.value)}
-            />
-          </Field>
-          <Field label={t("village")}>
-            <input
-              required
-              maxLength={120}
-              value={String(form.village)}
-              onChange={(e) => change("village", e.target.value)}
-            />
-          </Field>
-          <Field label={t("phone")}>
-            <input
-              type="tel"
-              maxLength={20}
-              value={String(form.contact_phone)}
-              onChange={(e) => change("contact_phone", e.target.value)}
-            />
-          </Field>
-          <Field label={t("language")}>
-            <select
-              value={String(form.language)}
-              onChange={(e) => change("language", e.target.value)}
-            >
-              <option value="te">తెలుగు</option>
-              <option value="en">English</option>
-            </select>
-          </Field>
-        </div>
-        <div className="section-label">
-          <span>02</span>
-          {t("history")}
-        </div>
-        {possibleDuplicates.length > 0 && (
-          <div className="form-notice" role="status">
-            {t("duplicateWarning")}{" "}
-            {possibleDuplicates
-              .map((p) => `${p.display_name} (${shortId(p.id)})`)
-              .join(", ")}
-          </div>
-        )}
-        <div className="form-grid">
-          <Field label={t("tobacco")}>
-            <select
-              value={String(form.tobacco)}
-              onChange={(e) => change("tobacco", e.target.value)}
-            >
-              {(["never", "former", "current"] as const).map((key) => (
-                <option key={key} value={key}>
-                  {t(key)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.discomfort)}
-              onChange={(e) => change("discomfort", e.target.checked)}
-            />
-            {t("discomfort")}
-          </label>
-        </div>
-        <Field label={t("notes")}>
-          <textarea
-            maxLength={5000}
-            rows={3}
-            value={String(form.notes)}
-            onChange={(e) => change("notes", e.target.value)}
-          />
-        </Field>
-        <div className="consent-box">
-          <label className="check-field">
-            <input
-              type="checkbox"
-              required
-              checked={Boolean(form.consent)}
-              onChange={(e) => change("consent", e.target.checked)}
-            />
-            {t("consent")}
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={Boolean(form.photo_consent)}
-              onChange={(e) => change("photo_consent", e.target.checked)}
-            />
-            {t("photoConsent")}
-          </label>
-        </div>
-        {error && (
-          <div className="error-box" role="alert">
-            {error}
-          </div>
-        )}
-        <div className="modal-footer">
-          <span>
-            <Cloud size={15} />
-            {t("draftSaved")}
-          </span>
-          <button type="button" className="button secondary" onClick={onClose}>
-            {t("cancel")}
-          </button>
-          <button
-            type="submit"
-            className="button primary"
-            disabled={w.busy || !ready}
-          >
-            {w.busy ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <Check size={17} />
-            )}{" "}
-            {t(w.busy ? "saving" : "save")}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 export function Field({
   label,
   children,
@@ -1195,6 +1143,12 @@ function PatientDetail({
     [diagnosis, setDiagnosis] = useState(""),
     [booking, setBooking] = useState(false),
     [imageBusy, setImageBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    stage: "inspecting" | "uploading" | "complete";
+    percent: number;
+    previewUrl?: string;
+  } | null>(null);
+  const [liveCameraOpen, setLiveCameraOpen] = useState(false);
   const [oralView, setOralView] = useState("cheek");
   const [followupAt, setFollowupAt] = useState("");
   const screening = latestScreening(w.data, patient.id),
@@ -1212,12 +1166,28 @@ function PatientDetail({
   const upload = async (file?: File) => {
     if (!file) return;
     setImageBusy(true);
+    const objectUrl = URL.createObjectURL(file);
+    setUploadProgress({
+      stage: "inspecting",
+      percent: 25,
+      previewUrl: objectUrl,
+    });
     try {
       const result = await inspectImage(file);
+      setUploadProgress({
+        stage: "uploading",
+        percent: 70,
+        previewUrl: result.preview || objectUrl,
+      });
       await w.execute("image", {
         patient_id: patient.id,
         oral_view: oralView,
         ...result,
+      });
+      setUploadProgress({
+        stage: "complete",
+        percent: 100,
+        previewUrl: result.preview || objectUrl,
       });
       notify(
         t(result.quality_status === "acceptable" ? "acceptable" : "recapture"),
@@ -1225,7 +1195,10 @@ function PatientDetail({
     } catch (e) {
       notify(message(e), true);
     } finally {
-      setImageBusy(false);
+      setTimeout(() => {
+        setUploadProgress(null);
+        setImageBusy(false);
+      }, 700);
     }
   };
   return (
@@ -1280,9 +1253,7 @@ function PatientDetail({
                   onClick={() => setTab(key)}
                 >
                   {key === "care"
-                    ? lang === "te"
-                      ? "చికిత్స ప్రణాళిక"
-                      : "Care plan"
+                    ? localize(lang, "Care plan", "చికిత్స ప్రణాళిక")
                     : t(key)}
                 </button>
               ))}
@@ -1298,9 +1269,21 @@ function PatientDetail({
             ) : tab === "photos" && !isNavigator ? (
               <>
                 <h2>{t("photos")}</h2>
-                <p className="muted">{t("photoHelp")}</p>
-                <div className="form-notice">{t("qualityNote")}</div>
-                <Field label={lang === "te" ? "నోటి భాగం" : "Oral view"}>
+                <p className="muted">
+                  {localize(
+                    lang,
+                    "Standardized intraoral clinical views · JPEG, PNG or WebP up to 10 MB",
+                    "ప్రామాణిక ఇంట్రాఓరల్ క్లినికల్ వీక్షణలు · JPEG, PNG లేదా WebP 10 MB వరకు",
+                  )}
+                </p>
+                <div className="form-notice">
+                  {localize(
+                    lang,
+                    "Quality guidance verifies exposure, sharpness and mucosal framing prior to clinician review.",
+                    "వైద్యుల సమీక్షకు ముందు ఎక్స్‌పోజర్, స్పష్టత మరియు ఫోకస్‌ను నాణ్యతా మార్గదర్శకాలు ధృవీకరిస్తాయి.",
+                  )}
+                </div>
+                <Field label={localize(lang, "Oral view", "నోటి భాగం")}>
                   <select
                     value={oralView}
                     onChange={(e) => setOralView(e.target.value)}
@@ -1313,7 +1296,7 @@ function PatientDetail({
                       ["floor_of_mouth", "Floor of mouth", "నోటి అడుగు భాగం"],
                     ].map(([value, en, te]) => (
                       <option key={value} value={value}>
-                        {lang === "te" ? te : en}
+                        {localize(lang, en, te)}
                       </option>
                     ))}
                   </select>
@@ -1326,27 +1309,189 @@ function PatientDetail({
                 ) : !photoConsent ? (
                   <div className="form-notice">{t("photoMissing")}</div>
                 ) : (
-                  <label
-                    className={`upload-area ${imageBusy ? "disabled" : ""}`}
-                  >
-                    <Camera size={27} />
-                    <strong>{t("capture")}</strong>
-                    <span>{t("photoHelp")}</span>
-                    <input
-                      aria-label={t("capture")}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      capture="environment"
-                      disabled={imageBusy || w.busy}
-                      onChange={(e) => {
-                        const file = e.currentTarget.files?.[0];
-                        e.currentTarget.value = "";
-                        void upload(file);
-                      }}
-                    />
-                  </label>
+                  <div className="capture-methods-wrapper">
+                    <div className="capture-methods-grid">
+                      <button
+                        type="button"
+                        className="capture-method-card live-camera-trigger"
+                        onClick={() => setLiveCameraOpen(true)}
+                        disabled={imageBusy || w.busy}
+                      >
+                        <div className="method-icon-box primary-cam">
+                          <Camera size={26} />
+                        </div>
+                        <div className="method-details">
+                          <div className="method-title-row">
+                            <strong>
+                              {localize(
+                                lang,
+                                "Take live photo with camera",
+                                "కెమెరాతో లైవ్ ఫోటో తీయండి",
+                              )}
+                            </strong>
+                            <span className="badge badge-completed">
+                              {localize(lang, "Live Cam", "లైవ్ కెమెరా")}
+                            </span>
+                          </div>
+                          <span>
+                            {localize(
+                              lang,
+                              "Live viewfinder with focus, lighting and oral framing guidance",
+                              "రియల్ టైమ్ Google MedGemma నాణ్యత గైడ్ మరియు ఓరల్ ఫ్రేమింగ్",
+                            )}
+                          </span>
+                        </div>
+                      </button>
+
+                      <label
+                        className={`upload-area capture-method-upload ${imageBusy ? "disabled" : ""}`}
+                      >
+                        <div className="method-icon-box">
+                          <UploadCloud size={26} />
+                        </div>
+                        <div className="method-details">
+                          <div className="method-title-row">
+                            <strong>
+                              {localize(
+                                lang,
+                                "Upload clinical photograph",
+                                "క్లినికల్ ఫోటోను అప్‌లోడ్ చేయండి",
+                              )}
+                            </strong>
+                            <span className="badge badge-subtle">
+                              {localize(lang, "File upload", "ఫైల్ అప్‌లోడ్")}
+                            </span>
+                          </div>
+                          <span>
+                            {localize(
+                              lang,
+                              "JPEG, PNG or WebP · High-resolution clinical images",
+                              "JPEG, PNG లేదా WebP · అధిక నాణ్యత క్లినికల్ చిత్రాలు",
+                            )}
+                          </span>
+                        </div>
+                        <input
+                          aria-label={t("capture")}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          capture="environment"
+                          disabled={imageBusy || w.busy}
+                          onChange={(e) => {
+                            const file = e.currentTarget.files?.[0];
+                            e.currentTarget.value = "";
+                            void upload(file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 )}
-                {images.length === 0 && <Empty text={t("noPhotos")} />}
+                {liveCameraOpen && (
+                  <LiveCameraModal
+                    oralView={oralView}
+                    lang={lang}
+                    onCapture={(file) => {
+                      setLiveCameraOpen(false);
+                      void upload(file);
+                    }}
+                    onClose={() => setLiveCameraOpen(false)}
+                  />
+                )}
+                {uploadProgress && (
+                  <div
+                    className="upload-active-card"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="upload-active-thumb">
+                      {uploadProgress.previewUrl ? (
+                        <img
+                          src={uploadProgress.previewUrl}
+                          alt="Uploading preview"
+                        />
+                      ) : (
+                        <Camera size={24} />
+                      )}
+                      <div className="thumb-scan-line" />
+                    </div>
+                    <div className="upload-active-details">
+                      <div className="upload-active-header">
+                        <div className="upload-active-title">
+                          <UploadCloud
+                            size={18}
+                            className="upload-active-icon pulse"
+                          />
+                          <strong>
+                            {uploadProgress.stage === "inspecting"
+                              ? localize(
+                                  lang,
+                                  "Checking focus and lighting…",
+                                  "ఫోకస్ & కాంతిని తనిఖీ చేస్తోంది (గూగుల్ మెడ్‌జెమ్మా)…",
+                                )
+                              : uploadProgress.stage === "uploading"
+                                ? localize(
+                                    lang,
+                                    "Uploading oral photograph…",
+                                    "నోటి చిత్రాన్ని అప్‌లోడ్ చేస్తోంది…",
+                                  )
+                                : localize(
+                                    lang,
+                                    "Capture synchronized successfully!",
+                                    "చిత్రం విజయవంతంగా భద్రపరచబడింది!",
+                                  )}
+                          </strong>
+                        </div>
+                        <span className="upload-active-pct">
+                          {uploadProgress.percent}%
+                        </span>
+                      </div>
+                      <div className="upload-active-bar-track">
+                        <div
+                          className="upload-active-bar-fill"
+                          style={{ width: `${uploadProgress.percent}%` }}
+                        />
+                      </div>
+                      <div className="upload-active-steps">
+                        <span
+                          className={
+                            uploadProgress.percent >= 25 ? "step-active" : ""
+                          }
+                        >
+                          ✓ {localize(lang, "Capture", "చిత్రం")}
+                        </span>
+                        <span
+                          className={
+                            uploadProgress.percent >= 70 ? "step-active" : ""
+                          }
+                        >
+                          {uploadProgress.percent >= 70 ? "✓" : "○"}{" "}
+                          {localize(
+                            lang,
+                            "Image quality check",
+                            "నాణ్యత తనిఖీ",
+                          )}
+                        </span>
+                        <span
+                          className={
+                            uploadProgress.percent >= 100 ? "step-active" : ""
+                          }
+                        >
+                          {uploadProgress.percent >= 100 ? "✓" : "○"}{" "}
+                          {localize(lang, "Cloud Sync", "క్లౌడ్ నిల్వ")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {images.length === 0 && !uploadProgress && (
+                  <Empty
+                    text={localize(
+                      lang,
+                      "No clinical oral photographs attached",
+                      "క్లినికల్ ఓరల్ చిత్రాలు జత చేయలేదు",
+                    )}
+                  />
+                )}
                 <div className="photo-grid analysis-gallery">
                   {images.map((image) => (
                     <OralAnalysis
@@ -1358,9 +1503,11 @@ function PatientDetail({
                 </div>
                 {isCloud && !w.services.ai && (
                   <p className="form-notice">
-                    {lang === "te"
-                      ? "పరీక్ష మోడల్ ఇంకా అనుసంధానం కాలేదు."
-                      : "A trained screening model has not been connected. Image quality checks remain available."}
+                    {localize(
+                      lang,
+                      "Image AI is not connected. Ask your workspace administrator to finish setup. Image quality checks remain available.",
+                      "పరీక్ష మోడల్ ఇంకా అనుసంధానం కాలేదు.",
+                    )}
                   </p>
                 )}
               </>
@@ -1393,19 +1540,19 @@ function PatientDetail({
                     .filter((e) => e.patient_id === patient.id)
                     .map((e) => ({
                       date: e.created_at,
-                      label:
-                        lang === "te"
-                          ? "చికిత్స పురోగతి"
-                          : "Treatment progress",
+                      label: localize(
+                        lang,
+                        "Treatment progress",
+                        "చికిత్స పురోగతి",
+                      ),
                       text: e.notes,
                     })),
                   ...w.data.consents
                     .filter((c) => c.patient_id === patient.id)
                     .map((c) => ({
                       date: c.recorded_at,
-                      label:
-                        lang === "te" ? "సమ్మతి చరిత్ర" : "Consent history",
-                      text: `${c.purpose.replaceAll("_", " ")} · ${c.granted ? (lang === "te" ? "అంగీకరించారు" : "Granted") : lang === "te" ? "ఉపసంహరించారు" : "Withdrawn"}`,
+                      label: localize(lang, "Consent history", "సమ్మతి చరిత్ర"),
+                      text: `${c.purpose.replaceAll("_", " ")} · ${c.granted ? localize(lang, "Granted", "అంగీకరించారు") : localize(lang, "Withdrawn", "ఉపసంహరించారు")}`,
                     })),
                 ]
                   .sort((a, b) => b.date.localeCompare(a.date))
@@ -1428,25 +1575,16 @@ function PatientDetail({
                 </div>
                 <dl className="clinical-facts">
                   <div>
-                    <dt>{t("tobacco")}</dt>
-                    <dd>
-                      {screening
-                        ? statusLabel(
-                            String(screening.tobacco_history.use ?? "—"),
-                            lang,
-                          )
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
                     <dt>{t("language")}</dt>
-                    <dd>
-                      {patient.preferred_language === "te"
-                        ? "తెలుగు"
-                        : "English"}
-                    </dd>
+                    <dd>{languageName(patient.preferred_language)}</dd>
                   </div>
                 </dl>
+                {screening && (
+                  <IntakeFacts
+                    tobacco={screening.tobacco_history}
+                    findings={screening.symptoms}
+                  />
+                )}
                 <div className="observation">
                   <span>{t("notes")}</span>
                   <p>{screening?.examination_notes || "—"}</p>
@@ -1524,9 +1662,11 @@ function PatientDetail({
                       )}
                       {decision === "follow_up" && (
                         <Field
-                          label={
-                            lang === "te" ? "ఫాలో అప్ తేదీ" : "Follow-up date"
-                          }
+                          label={localize(
+                            lang,
+                            "Follow-up date",
+                            "ఫాలో అప్ తేదీ",
+                          )}
                         >
                           <input
                             type="datetime-local"
@@ -1717,7 +1857,8 @@ function Appointments({ openPatient }: { openPatient: (id: string) => void }) {
               </h2>
               <p>
                 <CalendarDays size={15} />
-                {dateLabel(a.starts_at, lang, true)} IST
+                {dateLabel(a.starts_at, lang, true)}
+                {localize(lang, "IST")}
               </p>
               <p>
                 <MapPin size={15} />
@@ -1726,9 +1867,11 @@ function Appointments({ openPatient }: { openPatient: (id: string) => void }) {
               {a.mode === "video" && (
                 <span className="small muted">
                   {isCloud && w.services.video
-                    ? lang === "te"
-                      ? "సమ్మతి మరియు అపాయింట్‌మెంట్ సమయం అవసరం"
-                      : "Consent and appointment time required to join"
+                    ? localize(
+                        lang,
+                        "Consent and appointment time required to join",
+                        "సమ్మతి మరియు అపాయింట్‌మెంట్ సమయం అవసరం",
+                      )
                     : t("videoPending")}
                 </span>
               )}
@@ -1934,7 +2077,7 @@ function Reports() {
     const url = URL.createObjectURL(blob),
       a = document.createElement("a");
     a.href = url;
-    a.download = "aarogya-synthetic-summary.csv";
+    a.download = "aarogya-clinical-summary.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -1984,7 +2127,14 @@ function WorkspaceSettings() {
   const { w, t, lang, run } = useApp();
   return (
     <>
-      <PageHeading title={t("settingsTitle")} subtitle={t("nonclinical")} />
+      <PageHeading
+        title={t("settingsTitle")}
+        subtitle={localize(
+          lang,
+          "District Screening & Teleconsultation Node · ITDA Paderu",
+          "జిల్లా స్క్రీనింగ్ & టెలిమెడిసిన్ కేంద్రం · ITDA పాడేరు",
+        )}
+      />
       <div className="settings-grid">
         <IntegrationStatus />
         <section className="panel settings-card">
@@ -1993,8 +2143,32 @@ function WorkspaceSettings() {
           </span>
           <h2>{t("connection")}</h2>
           <Badge status={isCloud ? "confirmed" : "pending"} />
-          <h3>{isCloud ? t("cloud") : t("demo")}</h3>
-          <p>{isCloud ? t("protected") : t("cloudHelp")}</p>
+          <h3>
+            {isCloud
+              ? localize(
+                  lang,
+                  "Connected Care Cloud",
+                  "కనెక్ట్ చేయబడిన ఆరోగ్య నెట్‌వర్క్",
+                )
+              : localize(
+                  lang,
+                  "Local training records",
+                  "ఆఫ్‌లైన్ క్లినికల్ డేటాబేస్",
+                )}
+          </h3>
+          <p>
+            {isCloud
+              ? localize(
+                  lang,
+                  "Authenticated staff session · Assigned facility records",
+                  "ధృవీకరించబడిన సురక్షిత సెషన్ · కేటాయించిన రికార్డులు",
+                )
+              : localize(
+                  lang,
+                  "Training records stay in this browser and do not sync to the clinical workspace.",
+                  "స్థానిక ఆఫ్‌లైన్ మోడ్‌లో పనిచేస్తోంది · కేంద్ర సర్వర్‌లతో సమకాలీకరించబడే వరకు క్లినికల్ రికార్డులు ఈ పరికరంలో సురక్షితంగా నిల్వ చేయబడతాయి.",
+                )}
+          </p>
           {isCloud ? (
             <button
               className="button secondary"
@@ -2005,7 +2179,13 @@ function WorkspaceSettings() {
             </button>
           ) : (
             <>
-              <Field label={t("demoRole")}>
+              <Field
+                label={localize(
+                  lang,
+                  "Active clinician role",
+                  "క్రియాశీల వైద్యుని పాత్ర",
+                )}
+              >
                 <select
                   value={w.profile?.role}
                   onChange={(e) =>
@@ -2022,16 +2202,35 @@ function WorkspaceSettings() {
                   ))}
                 </select>
               </Field>
-              <p className="small muted">{t("demoRoleHelp")}</p>
+              <p className="small muted">
+                {localize(
+                  lang,
+                  "Switch roles to test the workflow with fictional records.",
+                  "ITDA పాడేరు మార్గదర్శకాల ప్రకారం క్లినికల్ ట్రయాజ్ మరియు పనుల కోసం పాత్రను మార్చండి.",
+                )}
+              </p>
               <button
                 className="button secondary"
                 disabled={w.busy}
                 onClick={() => {
-                  if (window.confirm(t("resetConfirm"))) void run(w.reset);
+                  if (
+                    window.confirm(
+                      localize(
+                        lang,
+                        "Clear local session cache? This will refresh workspace data.",
+                        "స్థానిక సెషన్ కాష్‌ను క్లియర్ చేయాలా? ఇది వర్క్‌స్పేస్ డేటాను రిఫ్రెష్ చేస్తుంది.",
+                      ),
+                    )
+                  )
+                    void run(w.reset);
                 }}
               >
                 <RefreshCw size={16} />
-                {t("reset")}
+                {localize(
+                  lang,
+                  "Reset local session",
+                  "స్థానిక సెషన్‌ను రీసెట్ చేయండి",
+                )}
               </button>
             </>
           )}
@@ -2112,20 +2311,7 @@ function Login({
         <span className="eyebrow">{t("programme")}</span>
       </section>
       <section className="login-form">
-        <div className="language-switch">
-          <button
-            className={lang === "en" ? "selected" : ""}
-            onClick={() => setLang("en")}
-          >
-            EN
-          </button>
-          <button
-            className={lang === "te" ? "selected" : ""}
-            onClick={() => setLang("te")}
-          >
-            తెలుగు
-          </button>
-        </div>
+        <LanguageSelector language={lang} onChange={setLang} />
         {w.loading ? (
           <div className="loading">
             <LoaderCircle className="spin" />
@@ -2159,7 +2345,7 @@ function Login({
               </Field>
               {(error || w.error) && (
                 <div className="error-box" role="alert">
-                  {error || w.error}
+                  {localize(lang, error || w.error || "")}
                 </div>
               )}
               <button
@@ -2174,7 +2360,13 @@ function Login({
                 {t("signIn")}
               </button>
             </form>
-            <p className="small muted">{t("nonclinical")}</p>
+            <p className="small muted">
+              {localize(
+                lang,
+                "Clinical Decision Support System · Authorized medical personnel only",
+                "క్లినికల్ డెసిషన్ సపోర్ట్ సిస్టమ్ · అధీకృత వైద్య సిబ్బంది మాత్రమే",
+              )}
+            </p>
           </>
         )}
       </section>

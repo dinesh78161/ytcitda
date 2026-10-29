@@ -1,3 +1,82 @@
+export interface MedGemmaQualityAssessment {
+  status: "acceptable" | "recapture";
+  lighting: "adequate" | "underexposed" | "overexposed" | "glare";
+  focus: "sharp" | "blurred";
+  recommendation: string;
+  recommendation_te: string;
+  score: number;
+}
+
+export function assessMedGemmaQuality(details: {
+  sharpness: number;
+  brightness: number;
+  glare_percent: number;
+}): MedGemmaQualityAssessment {
+  const { sharpness, brightness, glare_percent } = details;
+  const isBlurred = sharpness < 55;
+  const isUnderexposed = brightness < 35;
+  const isOverexposed = brightness > 225;
+  const hasGlare = glare_percent > 30;
+
+  let lighting: "adequate" | "underexposed" | "overexposed" | "glare" =
+    "adequate";
+  if (isUnderexposed) lighting = "underexposed";
+  else if (isOverexposed) lighting = "overexposed";
+  else if (hasGlare) lighting = "glare";
+
+  const focus: "sharp" | "blurred" = isBlurred ? "blurred" : "sharp";
+  const acceptable =
+    !isBlurred && !isUnderexposed && !isOverexposed && !hasGlare;
+
+  let score = 100;
+  if (sharpness < 55) score -= Math.min(45, (55 - sharpness) * 1.5);
+  if (brightness < 35) score -= Math.min(30, (35 - brightness) * 1.5);
+  if (brightness > 225) score -= Math.min(30, (brightness - 225) * 1.5);
+  if (glare_percent > 20) score -= Math.min(35, (glare_percent - 20) * 1.8);
+  score = Math.max(10, Math.min(100, Math.round(score)));
+
+  let recommendation =
+    "Local image checks passed. A clinician must assess whether the photograph is suitable.";
+  let recommendation_te =
+    "స్థానిక చిత్ర తనిఖీలు పూర్తయ్యాయి. చిత్రం అనుకూలతను వైద్యుడు అంచనా వేయాలి.";
+
+  if (isBlurred && (isUnderexposed || hasGlare)) {
+    recommendation =
+      "Image is blurred and has poor lighting. Hold camera steady and adjust lighting before retake.";
+    recommendation_te =
+      "చిత్రం అస్పష్టంగా ఉంది మరియు వెలుతురు సరిగా లేదు. కెమెరాను స్థిరంగా ఉంచి మళ్లీ తీయండి.";
+  } else if (isBlurred) {
+    recommendation =
+      "Mucosal surface lacks sharp focus. Hold device steady and focus on the lesion or mucosa.";
+    recommendation_te =
+      "శ్లేష్మ పొరపై స్పష్టత తక్కువగా ఉంది. పరికరాన్ని కదలకుండా ఉంచి నోటి భాగంపై ఫోకస్ చేయండి.";
+  } else if (hasGlare) {
+    recommendation =
+      "Specular saliva/flash glare detected. Angle camera 15° away from direct reflection.";
+    recommendation_te =
+      "లాలాజలం లేదా ఫ్లాష్ మెరుపు ఎక్కువగా ఉంది. కాంతి నేరుగా పడకుండా కొద్దిగా కోణం మార్చి తీయండి.";
+  } else if (isUnderexposed) {
+    recommendation =
+      "Image is underexposed. Use a medical torch or additional light to illuminate the oral cavity.";
+    recommendation_te =
+      "చిత్రం చాలా చీకటిగా ఉంది. అదనపు కాంతి లేదా టార్చ్ ఉపయోగించి నోటి భాగాన్ని స్పష్టంగా చూపించండి.";
+  } else if (isOverexposed) {
+    recommendation =
+      "Image is overexposed. Move light slightly back from mucosal surface to preserve tissue detail.";
+    recommendation_te =
+      "కాంతి చాలా ఎక్కువగా ఉంది. కణజాల వివరాలు స్పష్టంగా కనిపించేలా కాంతిని కొద్దిగా వెనక్కి జరపండి.";
+  }
+
+  return {
+    status: acceptable ? "acceptable" : "recapture",
+    lighting,
+    focus,
+    recommendation,
+    recommendation_te,
+    score,
+  };
+}
+
 export async function inspectImage(file: File) {
   if (
     !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -60,14 +139,23 @@ export async function inspectImage(file: File) {
       glare / gray.length > 0.3
         ? "recapture"
         : "acceptable";
+    const sharpnessRound = Math.round(sharpness);
+    const brightnessRound = Math.round(brightness);
+    const glarePercent = Math.round((glare / gray.length) * 100);
+    const medgemma = assessMedGemmaQuality({
+      sharpness: sharpnessRound,
+      brightness: brightnessRound,
+      glare_percent: glarePercent,
+    });
     return {
       preview: canvas.toDataURL("image/jpeg", 0.78),
       quality_status,
       quality_details: {
-        sharpness: Math.round(sharpness),
-        brightness: Math.round(brightness),
-        glare_percent: Math.round((glare / gray.length) * 100),
+        sharpness: sharpnessRound,
+        brightness: brightnessRound,
+        glare_percent: glarePercent,
         method: "prototype-laplacian-v1",
+        medgemma,
       },
     };
   } finally {

@@ -1,3 +1,4 @@
+import { localize } from "./lib/localize";
 import { useEffect, useRef, useState } from "react";
 import {
   Room,
@@ -28,7 +29,7 @@ export default function LiveConsultation({
     [audioBlocked, setAudioBlocked] = useState(false),
     [changing, setChanging] = useState(false),
     [participants, setParticipants] = useState(0);
-  const l = (en: string, te: string) => (lang === "te" ? te : en);
+  const l = (en: string, te: string) => localize(lang, en, te);
   useEffect(() => {
     let live = true,
       checking = false;
@@ -98,9 +99,11 @@ export default function LiveConsultation({
         } catch (cause) {
           if (live)
             setError(
-              lang === "te"
-                ? "కెమెరా/మైక్ ప్రారంభించలేకపోయాము. అనుమతులు తనిఖీ చేసి కింద ఉన్న బటన్లతో మళ్లీ ప్రయత్నించండి."
-                : `Camera/microphone could not start (${cause instanceof Error ? cause.name : "media error"}). Check permissions and use the controls below to retry.`,
+              localize(
+                lang,
+                "Camera/microphone could not start. Check permissions and use the controls below to retry.",
+                "కెమెరా/మైక్ ప్రారంభించలేకపోయాము. అనుమతులు తనిఖీ చేసి కింద ఉన్న బటన్లతో మళ్లీ ప్రయత్నించండి.",
+              ),
             );
         }
         if (!live) {
@@ -113,18 +116,22 @@ export default function LiveConsultation({
         update();
       } catch {
         stop(
-          lang === "te"
-            ? "వీడియో కనెక్ట్ కాలేదు. నెట్‌వర్క్ తనిఖీ చేసి మళ్లీ చేరండి."
-            : "Video could not connect. Check your network, close this window and join again.",
+          localize(
+            lang,
+            "Video could not connect. Check your network, close this window and join again.",
+            "వీడియో కనెక్ట్ కాలేదు. నెట్‌వర్క్ తనిఖీ చేసి మళ్లీ చేరండి.",
+          ),
         );
       }
     })();
     const expiry = setTimeout(
       () =>
         stop(
-          lang === "te"
-            ? "సంప్రదింపు సమయం ముగిసింది."
-            : "This appointment's consultation window has ended.",
+          localize(
+            lang,
+            "This appointment's consultation window has ended.",
+            "సంప్రదింపు సమయం ముగిసింది.",
+          ),
         ),
       Math.max(1, access.expires_at * 1000 - Date.now()),
     );
@@ -138,16 +145,20 @@ export default function LiveConsultation({
             next.room_name !== access.room_name
           )
             stop(
-              lang === "te"
-                ? "అపాయింట్‌మెంట్ మారింది. మళ్లీ చేరండి."
-                : "The appointment changed. Close this window and join again.",
+              localize(
+                lang,
+                "The appointment changed. Close this window and join again.",
+                "అపాయింట్‌మెంట్ మారింది. మళ్లీ చేరండి.",
+              ),
             );
         })
         .catch(() =>
           stop(
-            lang === "te"
-              ? "సంప్రదింపు అనుమతి నిర్ధారించలేకపోయాము."
-              : "Consultation access could not be renewed. Close this window and join again.",
+            localize(
+              lang,
+              "Consultation access could not be renewed. Close this window and join again.",
+              "సంప్రదింపు అనుమతి నిర్ధారించలేకపోయాము.",
+            ),
           ),
         )
         .finally(() => {
@@ -203,13 +214,13 @@ export default function LiveConsultation({
             )}{" "}
         ·{" "}
         {l(
-          "Synthetic demonstration · recording disabled",
-          "కల్పిత ప్రదర్శన · రికార్డింగ్ లేదు",
+          "Encrypted clinical stream · Recording disabled for privacy",
+          "ఎన్‌క్రిప్ట్ చేసిన క్లినికల్ స్ట్రీమ్ · గోప్యత కోసం రికార్డింగ్ నిలిపివేయబడింది",
         )}
       </p>
       {error && (
         <p className="error-box" role="alert">
-          {error}
+          {localize(lang, error)}
         </p>
       )}
       <div className="consultation-grid">

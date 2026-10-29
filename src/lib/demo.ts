@@ -18,6 +18,8 @@ import {
   closureBlockers,
   stages,
 } from "./journey.ts";
+import { normalizeIntake } from "./intake.ts";
+import { isLanguage } from "./languages.ts";
 
 export const DEMO_FACILITY = "10000000-0000-4000-8000-000000000001";
 const id = (prefix: string, n: number) =>
@@ -81,7 +83,7 @@ export function createDemo(): DataSet {
       examiner_id: demoProfiles[0].id,
       status: n <= 4 ? "referral_planned" : "awaiting_clinician",
       examination_notes:
-        "Synthetic intake. Independent clinician review requested.",
+        "Initial clinical intake. Medical officer review requested.",
       symptoms: { discomfort: n % 2 === 0 },
       tobacco_history: { use: n % 3 === 0 ? "current" : "never" },
       revision: 1,
@@ -270,6 +272,7 @@ export function applyDemoCommand(
   if (applyCareCommand(data, profile, command)) return syncStages(data);
   if (command.action === "register") {
     requireRole(["health_worker"]);
+    const intake = normalizeIntake(p);
     const name = String(p.display_name ?? "").trim(),
       village = String(p.village ?? "").trim(),
       age = Number(p.age_years);
@@ -293,7 +296,7 @@ export function applyDemoCommand(
       age_years: age,
       village,
       contact_phone: String(p.contact_phone ?? ""),
-      preferred_language: p.language === "te" ? "te" : "en",
+      preferred_language: isLanguage(p.language) ? p.language : "en",
       facility_id: profile.facility_id,
       registered_by: profile.id,
       is_synthetic: true,
@@ -304,6 +307,7 @@ export function applyDemoCommand(
       patient_id,
       purpose: "screening",
       granted: true,
+      language: isLanguage(p.language) ? p.language : "en",
       recorded_at: now,
     });
     if (p.photo_consent === true)
@@ -312,6 +316,7 @@ export function applyDemoCommand(
         patient_id,
         purpose: "image_capture",
         granted: true,
+        language: isLanguage(p.language) ? p.language : "en",
         recorded_at: now,
       });
     data.screenings.unshift({
@@ -320,8 +325,7 @@ export function applyDemoCommand(
       examiner_id: profile.id,
       status: "awaiting_clinician",
       examination_notes: String(p.notes ?? ""),
-      symptoms: { discomfort: p.discomfort === true },
-      tobacco_history: { use: String(p.tobacco ?? "never") },
+      ...intake,
       revision: 1,
       created_at: now,
     });
@@ -489,6 +493,7 @@ export function applyDemoCommand(
         p.quality_status === "acceptable" ? "acceptable" : "recapture",
       preview: String(p.preview),
       quality_details: p.quality_details as Record<string, unknown>,
+      oral_view: String(p.oral_view ?? "cheek"),
       created_at: now,
     });
   } else if (command.action === "analyze") {
@@ -504,6 +509,7 @@ export function applyDemoCommand(
       provider: "mock",
       model_version: "mock-v1",
       research_label: "demo_review_required",
+      score: null,
       status: "completed",
       clinical_use: false,
       requires_clinician_review: true,

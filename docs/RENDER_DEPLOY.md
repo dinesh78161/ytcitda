@@ -23,12 +23,19 @@ store. No patient files are saved on Render's local filesystem.
 | `SUPABASE_URL`              | Your Supabase project URL                       |
 | `SUPABASE_PUBLISHABLE_KEY`  | Your publishable key (or legacy anon key)       |
 | `SUPABASE_SECRET_KEY`       | Your current server secret key                  |
+| `WORKSPACE_MODE`            | `clinical` for the activated clinic workspace   |
+| `SCREENING_AI_MODE`         | `disabled` for clinical patient records         |
 | `REMINDER_DELIVERY_ENABLED` | `false` until a delivery provider is configured |
 
 The build command sets the browser's Supabase mode, URL and publishable key from
 these variables. The server secret stays on the server. The build needs development
 dependencies, which is why `--include=dev` is included. Node is pinned by
 `.node-version`. Render supplies `PORT` and `RENDER_EXTERNAL_URL` automatically.
+
+Clinical mode also requires the matching database policy. Follow
+[clinical activation](CLINICAL_WORKSPACE.md) before introducing patient data.
+The build reads `WORKSPACE_MODE`, so changing it requires rebuilding the frontend.
+Use `WORKSPACE_MODE=evaluation` for the retained research/test workflow.
 Do not copy the local `API_HOST`, `API_PORT` or `APP_ORIGINS` into Render. The server
 listens on `0.0.0.0` and automatically accepts its own Render HTTPS origin.
 
@@ -40,11 +47,6 @@ connected only through a public repository URL needs manual deploys.
 Set `SCREENING_AI_MODE=mock` for the handbook demo. This is also the default if no
 research endpoint is set. `research` requires all three model settings; `disabled`
 allows an AI-failure rehearsal while clinicians continue reviewing cases.
-
-For Gemini image observations, use `SCREENING_AI_MODE=gemini`, set
-`GEMINI_MODEL=gemini-3.5-flash-lite`, and add `GEMINI_API_KEY` to the server
-environment. Apply the image-findings migration and deploy this Gemini-capable
-revision before selecting Gemini mode. See [Gemini setup](GEMINI_SETUP.md).
 
 For the no-card video demo, set `VIDEO_PROVIDER=livekit`, `LIVEKIT_URL`,
 `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` using a LiveKit Cloud Build project.

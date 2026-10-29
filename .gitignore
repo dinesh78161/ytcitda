@@ -2,6 +2,11 @@
 .env.*
 !.env.example
 !.env.server.example
+!.env.recovery.example
+!.env.acceptance.example
+backups/
+*.adbackup
+*.dump
 node_modules/
 .supabase/
 supabase/.temp/
@@ -11,3 +16,9 @@ coverage/
 dist/
 test-results/
 playwright-report/
+ml/data/
+ml/artifacts/
+.venv-oral/
+__pycache__/
+*.pyc
+.language-work/

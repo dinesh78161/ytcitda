@@ -29,6 +29,7 @@ if (key.startsWith("eyJ")) {
 const env = {
   ...process.env,
   VITE_APP_MODE: "supabase",
+  VITE_WORKSPACE_MODE: process.env.WORKSPACE_MODE || "evaluation",
   VITE_SUPABASE_URL: url,
   VITE_SUPABASE_PUBLISHABLE_KEY: key,
 };

@@ -57,6 +57,24 @@ export function qualityOf({ data, width, height }) {
       sharpness: Math.round(sharpness),
       glare_percent: Math.round((100 * glare) / gray.length),
       method: "prototype-laplacian-v1-server",
+      medgemma: {
+        status:
+          sharpness >= 55 &&
+          brightness >= 35 &&
+          brightness <= 225 &&
+          glare / gray.length <= 0.3
+            ? "acceptable"
+            : "recapture",
+        focus: sharpness >= 55 ? "sharp" : "blurred",
+        lighting:
+          brightness < 35
+            ? "underexposed"
+            : brightness > 225
+              ? "overexposed"
+              : glare / gray.length > 0.3
+                ? "glare"
+                : "adequate",
+      },
     },
   };
 }

@@ -1,12 +1,20 @@
 import { test, expect, type Page } from "@playwright/test";
 
+async function captureDemo(page: Page, scene: string) {
+  if (process.env.CAPTURE_DEMO === "1")
+    await page.screenshot({
+      path: `test-results/recording/${scene}.png`,
+      animations: "disabled",
+    });
+}
+
 async function register(page: Page, name: string) {
   await page
     .getByRole("button", { name: "Register patient", exact: true })
     .first()
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Full name (synthetic)").fill(name);
+  await dialog.getByLabel("Full name").fill(name);
   await dialog.getByLabel("Age in years").fill("46");
   await dialog.getByLabel("Village / mandal").fill("G. Madugula");
   await dialog
@@ -15,6 +23,9 @@ async function register(page: Page, name: string) {
   await dialog
     .getByLabel("Separate consent for educational oral photographs")
     .check();
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await captureDemo(page, "registration");
   await dialog
     .getByRole("button", { name: "Save screening", exact: true })
     .click();
@@ -32,6 +43,88 @@ async function openPatient(page: Page, name: string) {
     .getByRole("button", { name: `Open record: ${name}`, exact: true })
     .click();
 }
+
+test("worker screening validates, restores its draft, and saves structured findings", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Start screening", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(dialog.getByLabel("Full name")).toBeVisible();
+  await dialog.getByLabel("Full name").fill("Synthetic Structured Intake");
+  await dialog.getByLabel("Age in years").fill("46");
+  await dialog.getByLabel("Village / mandal").fill("Paderu");
+  await dialog
+    .getByLabel("Screening consent recorded in the selected language")
+    .check();
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await dialog.getByLabel("Chutta (reverse smoking)", { exact: true }).check();
+  await dialog
+    .getByLabel("Tobacco history", { exact: true })
+    .selectOption("current");
+  await dialog.getByLabel("Habit duration (years)", { exact: true }).fill("15");
+  await dialog
+    .getByLabel("Daily frequency (times/day)", { exact: true })
+    .fill("8");
+  await dialog
+    .getByLabel("Burning sensation with spices", { exact: true })
+    .check();
+  await dialog.getByLabel("Mouth opening (mm)", { exact: true }).fill("101");
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    dialog.getByLabel("Mouth opening (mm)", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByLabel("Mouth opening (mm)", { exact: true }).fill("32");
+  await dialog
+    .getByLabel("Cervical lymph nodes", { exact: true })
+    .selectOption("not_assessed");
+  await expect(dialog.getByRole("status")).toContainText(
+    "Draft saved on this device",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Start screening", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByLabel("Mouth opening (mm)", { exact: true }),
+  ).toHaveValue("32");
+  await expect(
+    dialog.getByLabel("Chutta (reverse smoking)", { exact: true }),
+  ).toBeChecked();
+  await page.screenshot({
+    path: "test-results/worker-screening-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/worker-screening-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(dialog).toContainText("Synthetic Structured Intake");
+  await expect(dialog).toContainText("Burning sensation with spices");
+  await dialog
+    .getByRole("button", { name: "Save screening", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await openPatient(page, "Synthetic Structured Intake");
+  await expect(page.locator(".intake-summary")).toContainText(
+    "Chutta (reverse smoking)",
+  );
+  await expect(page.locator(".intake-summary")).toContainText(
+    "Burning sensation with spices",
+  );
+  await expect(page.locator(".intake-summary")).toContainText("32");
+  await expect(page.locator(".intake-summary")).toContainText("Not assessed");
+});
 
 test("dashboard, registration, doctor referral, booking and simulated outcome", async ({
   page,
@@ -55,7 +148,7 @@ test("dashboard, registration, doctor referral, booking and simulated outcome", 
     page.getByText("Synthetic Browser Patient", { exact: true }),
   ).toBeVisible();
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("medical_officer");
   await openPatient(page, "Synthetic Browser Patient");
   await page
@@ -139,8 +232,9 @@ test("guided nine-step journey completes care, persists closure and reaches dist
     "data-state",
     "recorded",
   );
+  await captureDemo(page, "photos-quality-ai");
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("medical_officer");
   await openPatient(page, "Synthetic Complete Journey");
   await page
@@ -151,6 +245,7 @@ test("guided nine-step journey completes care, persists closure and reaches dist
     "data-state",
     "complete",
   );
+  await captureDemo(page, "officer-review");
   await journey.locator('[data-step="consultation"] button').click();
   await page
     .getByRole("button", { name: "Book appointment", exact: true })
@@ -184,6 +279,7 @@ test("guided nine-step journey completes care, persists closure and reaches dist
     "data-state",
     "complete",
   );
+  await captureDemo(page, "diagnostics");
   await page
     .getByLabel("Treatment plan", { exact: true })
     .fill("Synthetic care plan");
@@ -223,6 +319,7 @@ test("guided nine-step journey completes care, persists closure and reaches dist
     "data-state",
     "complete",
   );
+  await captureDemo(page, "treatment");
   await page
     .getByLabel("Clinical rationale", { exact: true })
     .fill("Synthetic case resolved after review and follow-up");
@@ -262,7 +359,7 @@ test("guided nine-step journey completes care, persists closure and reaches dist
   await expect(journey).toContainText("Case closed");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("district_admin");
   await page
     .getByRole("navigation")
@@ -271,6 +368,7 @@ test("guided nine-step journey completes care, persists closure and reaches dist
   await expect(
     page.locator(".stage-row").filter({ hasText: "Closed" }).locator("strong"),
   ).toHaveText("1");
+  await captureDemo(page, "district-reports");
   expect(errors).toEqual([]);
 });
 
@@ -323,7 +421,7 @@ test("Telugu mobile navigation, registration labels and no page overflow", async
   await expect(
     page.getByRole("heading", { name: "A clearer path to care." }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "తెలుగు", exact: true }).click();
+  await page.locator(".language-picker select").selectOption("te");
   await expect(
     page.getByRole("heading", { name: "మెరుగైన సంరక్షణకు స్పష్టమైన మార్గం." }),
   ).toBeVisible();
@@ -349,7 +447,7 @@ test("Telugu mobile navigation, registration labels and no page overflow", async
     .getByRole("button", { name: "రోగిని నమోదు చేయండి", exact: true })
     .first()
     .click();
-  await expect(page.getByLabel("పూర్తి పేరు (కల్పిత)")).toBeVisible();
+  await expect(page.getByLabel("పూర్తి పేరు", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "రద్దు", exact: true }).click();
   await page.getByRole("button", { name: "మెనూ తెరవండి" }).click();
   await page
@@ -366,7 +464,7 @@ test("district role has aggregates without patient rows and can export CSV", asy
 }) => {
   await page.goto("/");
   await page
-    .getByLabel("Demo role", { exact: true })
+    .getByLabel("Training role selection", { exact: true })
     .selectOption("district_admin");
   await expect(page.getByRole("table")).toHaveCount(0);
   await expect(
@@ -381,7 +479,7 @@ test("district role has aggregates without patient rows and can export CSV", asy
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export summary CSV" }).click();
   expect((await download).suggestedFilename()).toBe(
-    "aarogya-synthetic-summary.csv",
+    "aarogya-clinical-summary.csv",
   );
 });
 
@@ -442,4 +540,97 @@ test("photo decoding, retake guidance and nonclinical mock analysis", async ({
   await expect(accepted).toHaveCount(1);
   await accepted.getByRole("button", { name: "Run mock AI" }).click();
   await expect(accepted).toContainText("No medical prediction was made.");
+  await expect(accepted.locator(".analysis-score strong")).toHaveText("—");
+  await expect(accepted.locator("meter")).toHaveCount(0);
+  await expect(accepted).toContainText("Independent clinician examination required");
+  await expect(accepted).toContainText("Not assessed");
+  await page.locator(".toast .icon-button").click();
+  await accepted.screenshot({ path: "test-results/oral-analyser-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+  await accepted.screenshot({ path: "test-results/oral-analyser-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.reload();
+  await openPatient(page, "Synthetic Photo Patient");
+  await page
+    .getByRole("tab", { name: "Oral photographs", exact: true })
+    .click();
+  await expect(page.locator(".analysis-score strong")).toHaveText(["—", "—"]);
+  // Persist an explicit server-report fixture to verify rendering, not inference.
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const opening = indexedDB.open("aarogya-synthetic-workspace", 1);
+      opening.onerror = () => reject(opening.error);
+      opening.onsuccess = () => {
+        const db = opening.result;
+        const tx = db.transaction("kv", "readwrite");
+        const store = tx.objectStore("kv");
+        const request = store.get("demo-v1");
+        request.onsuccess = () => {
+          const data = request.result;
+          const patient = data.patients.find(
+            (p: { display_name: string }) =>
+              p.display_name === "Synthetic Photo Patient",
+          );
+          const image = data.images.find(
+            (i: { patient_id: string; quality_status: string }) =>
+              i.patient_id === patient.id && i.quality_status === "acceptable",
+          );
+          data.ai_analyses.unshift({
+            id: crypto.randomUUID(),
+            image_id: image.id,
+            provider: "research",
+            model_version: "gemini-report-test-fixture",
+            research_label: "not_an_oral_photo",
+            score: null,
+            clinical_use: false,
+            requires_clinician_review: true,
+            status: "completed",
+            created_at: new Date(Date.now() + 1000).toISOString(),
+            findings: {
+              engine: "gemini",
+              prompt_version: "oral-observation-v1",
+              image_kind: "not_oral_photo",
+              summary:
+                "Synthetic Gemini report fixture: this test pattern is not an oral photograph.",
+              visible_findings: [],
+              possible_conditions: [],
+              limitations: [
+                "Upload a suitable educational oral photograph; no disease assessment was performed.",
+              ],
+            },
+          });
+          store.put(data, "demo-v1");
+        };
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error);
+        };
+      };
+    });
+  });
+  await page.reload();
+  await openPatient(page, "Synthetic Photo Patient");
+  await page
+    .getByRole("tab", { name: "Oral photographs", exact: true })
+    .click();
+  const report = page
+    .locator(".photo-card")
+    .filter({ has: page.locator(".vision-report") });
+  await expect(report).toContainText("Synthetic Gemini report fixture");
+  await expect(report.locator(".analysis-score")).toHaveCount(0);
+  await expect(report.locator("meter")).toHaveCount(0);
+  await expect(page.locator('[data-step="analysis"]')).toHaveAttribute(
+    "data-state",
+    "recorded",
+  );
+  await report.screenshot({ path: "test-results/gemini-report-fixture.png" });
 });

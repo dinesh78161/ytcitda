@@ -6,7 +6,9 @@ import {
   type Profile,
   type Summary,
 } from "./types";
-export const isCloud = import.meta.env.VITE_APP_MODE === "supabase";
+const appMode = import.meta.env.VITE_APP_MODE;
+export const isClinical = import.meta.env.VITE_WORKSPACE_MODE === "clinical";
+export const isCloud = appMode !== "demo";
 const url = import.meta.env.VITE_SUPABASE_URL ?? "",
   key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
 const valid =
@@ -15,10 +17,30 @@ const valid =
   key.length > 15 &&
   !key.includes("YOUR_");
 export const configurationError =
-  isCloud && !valid
-    ? "Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env, then restart the app."
-    : null;
+  !["supabase", "demo"].includes(appMode) ||
+  (isClinical && !isCloud) ||
+  ![undefined, "evaluation", "clinical"].includes(
+    import.meta.env.VITE_WORKSPACE_MODE,
+  )
+    ? "Configure an authenticated Supabase workspace. Local training must be selected explicitly."
+    : isCloud && !valid
+      ? "Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env, then restart the app."
+      : null;
 export const supabase = isCloud && valid ? createClient(url, key) : null;
+export async function verifyClinicalWorkspace() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const result = await supabase.rpc("workspace_policy");
+  if (!isClinical && ["PGRST202", "42883"].includes(result.error?.code ?? ""))
+    return;
+  if (
+    result.error ||
+    result.data?.version !== 1 ||
+    result.data.mode !== (isClinical ? "clinical" : "evaluation")
+  )
+    throw new Error(
+      "Workspace configuration does not match this application. Contact your workspace administrator.",
+    );
+}
 export async function fetchProfile(id: string): Promise<Profile> {
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase
@@ -64,6 +86,27 @@ export async function fetchWorkspace(
 }
 export async function submitCloud(command: Command) {
   if (!supabase) throw new Error("Supabase is not configured.");
+  if (
+    command.action === "register" &&
+    command.payload.language &&
+    !["en", "te"].includes(String(command.payload.language))
+  ) {
+    const policy = await supabase.rpc("language_policy");
+    if (
+      policy.error ||
+      !policy.data?.languages?.includes(command.payload.language)
+    )
+      throw new Error(
+        "Additional patient languages are not available in this workspace yet. Your draft is saved; contact your workspace administrator.",
+      );
+  }
+  if (command.action === "register" && command.payload.intake_version === 1) {
+    const policy = await supabase.rpc("screening_intake_policy");
+    if (policy.error || policy.data?.version !== 1)
+      throw new Error(
+        "The screening intake update is not available in this workspace yet. Your draft is saved; contact your workspace administrator.",
+      );
+  }
   const { data, error } = await supabase.rpc("submit_workflow", {
     request_id: command.id,
     action: command.action,

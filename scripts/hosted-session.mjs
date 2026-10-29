@@ -78,5 +78,45 @@ export async function demoSession(clients, role) {
   );
   if (!session || session.user.id !== account.id)
     throw new Error("Unexpected test-session identity.");
-  return { client, session, role };
+  let verifiedSession = session;
+  try {
+    if (["medical_officer", "specialist", "district_admin"].includes(role)) {
+      const policy = await client.rpc("security_policy");
+      const enrolled = session.user.factors?.some(
+        (factor) => factor.status === "verified",
+      );
+      if ((!policy.error && policy.data?.privileged_mfa) || enrolled) {
+        const code = process.env[`HOSTED_TOTP_CODE_${role.toUpperCase()}`];
+        if (!/^\d{6}$/.test(code || ""))
+          throw new Error(
+            `Complete authenticator enrollment for ${role}, then supply a fresh HOSTED_TOTP_CODE_${role.toUpperCase()} locally. Existing factors are never bypassed by hosted tests.`,
+          );
+        const factors = checked(
+          await client.auth.mfa.listFactors(),
+          "Authenticator lookup",
+        );
+        const factor = factors.totp.find((item) => item.status === "verified");
+        if (!factor)
+          throw new Error(
+            `Enroll ${role}'s authenticator in the app before acceptance testing.`,
+          );
+        checked(
+          await client.auth.mfa.challengeAndVerify({
+            factorId: factor.id,
+            code,
+          }),
+          "Authenticator verification",
+        );
+        verifiedSession = checked(
+          await client.auth.getSession(),
+          "Verified test session",
+        ).session;
+        if (!verifiedSession) throw new Error("Verified test session missing.");
+      }
+    }
+    return { client, session: verifiedSession, role };
+  } catch (error) {
+    await client.auth.signOut({ scope: "local" });
+    throw error;
+  }
 }

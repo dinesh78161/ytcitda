@@ -1,17 +1,19 @@
+import { localize } from "./lib/localize";
+import { languageName } from "./lib/languages";
+import { oralViewLabel } from "./lib/i18n";
 import { useEffect, useState } from "react";
 import {
   Activity,
   Camera,
   ChevronDown,
-  FlaskConical,
+  Eye,
   LoaderCircle,
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  Stethoscope,
 } from "lucide-react";
 import { useApp } from "./App";
-import { isCloud } from "./lib/client";
+import { isCloud, isClinical } from "./lib/client";
 import { careApi, downloadUrl } from "./lib/services";
 import type { OralImage } from "./lib/types";
 
@@ -23,7 +25,7 @@ export default function OralAnalysis({
   consent: boolean;
 }) {
   const { w, t, lang, run } = useApp();
-  const copy = (en: string, te: string) => (lang === "te" ? te : en);
+  const copy = (en: string, te: string) => localize(lang, en, te);
   const [source, setSource] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false),
     [previewAttempt, setPreviewAttempt] = useState(0);
@@ -35,9 +37,17 @@ export default function OralAnalysis({
   const researchAvailable =
     isCloud &&
     w.services.ai &&
-    ["research", "gemini"].includes(w.services.ai_provider || "");
-  const geminiMode = w.services.ai_provider === "gemini";
-  const visionResult = result?.findings?.engine === "gemini";
+    ["research", "gemini", "medgemma"].includes(w.services.ai_provider || "");
+  const geminiMode = ["gemini", "medgemma"].includes(
+    w.services.ai_provider || "",
+  );
+  const medgemmaMode =
+    w.services.ai_provider === "medgemma" ||
+    result?.findings?.engine === "medgemma" ||
+    result?.model_version?.includes("medgemma");
+  const visionResult =
+    result?.findings?.engine === "gemini" ||
+    result?.findings?.engine === "medgemma";
   const findings = consent && visionResult ? result.findings : null;
   const runMock = !isCloud || w.services.ai_provider === "mock";
   const mock = result
@@ -57,7 +67,9 @@ export default function OralAnalysis({
   const analyze = async () => {
     setAnalyzing(true);
     try {
-      await run(() => w.execute("analyze", { image_id: image.id }));
+      await run(() =>
+        w.execute("analyze", { image_id: image.id, language: lang }),
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -96,7 +108,7 @@ export default function OralAnalysis({
         </div>
         {imageSource ? (
           <img
-            className="oral-analysis-photo"
+            className="oral-analysis-photo photo-reveal-animated"
             src={imageSource}
             alt={t("photos")}
             onError={() => {
@@ -105,15 +117,15 @@ export default function OralAnalysis({
             }}
           />
         ) : (
-          <div className="photo-placeholder oral-preview-placeholder">
+          <div className="photo-placeholder oral-preview-placeholder scanning-active">
             {!consent ? (
               <>
-                <ShieldCheck />
+                <ShieldCheck size={28} />
                 <span>{t("photoMissing")}</span>
               </>
             ) : previewError ? (
               <>
-                <Camera />
+                <Camera size={28} />
                 <span>
                   {copy("Preview unavailable", "ప్రివ్యూ అందుబాటులో లేదు")}
                 </span>
@@ -126,17 +138,41 @@ export default function OralAnalysis({
                 </button>
               </>
             ) : (
-              <>
-                <LoaderCircle className="spin" />
-                <span>{t("loading")}</span>
-              </>
+              <div className="scanner-viewfinder">
+                <div className="scanner-grid" />
+                <div className="scanner-laser" />
+                <div className="viewfinder-corner tl" />
+                <div className="viewfinder-corner tr" />
+                <div className="viewfinder-corner bl" />
+                <div className="viewfinder-corner br" />
+                <div className="scanner-center-content">
+                  <div className="scanner-pulse-ring">
+                    <Sparkles className="scanner-icon spin" size={24} />
+                  </div>
+                  <strong className="scanner-label">
+                    {copy(
+                      "Processing oral capture…",
+                      "నోటి చిత్రాన్ని ప్రాసెస్ చేస్తోంది…",
+                    )}
+                  </strong>
+                  <span className="scanner-sublabel">
+                    {copy(
+                      "Preparing photograph and image quality checks",
+                      "అధిక నాణ్యత చిత్రాన్ని మరియు నాణ్యత ప్రమాణాలను సమన్వయం చేస్తోంది",
+                    )}
+                  </span>
+                  <div className="scanner-progress-track">
+                    <div className="scanner-progress-bar" />
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
         <div className="analysis-image-actions">
           <small>
             {image.oral_view
-              ? image.oral_view.replaceAll("_", " ")
+              ? oralViewLabel(image.oral_view, lang)
               : copy("Oral view", "నోటి భాగం")}
           </small>
           {isCloud && (
@@ -180,279 +216,237 @@ export default function OralAnalysis({
             </div>
           ))}
         </dl>
-        <p className="analysis-quality-note">
-          {copy(
-            "Prototype quality measurements; they do not detect disease or confirm that an image is oral.",
-            "ఇవి ప్రాథమిక నాణ్యత కొలతలు మాత్రమే; వ్యాధిని లేదా నోటి చిత్రమని నిర్ధారించవు.",
-          )}
-        </p>
       </div>
       <section
         className="analysis-findings"
-        aria-label={copy(
-          "Experimental image findings",
-          "ప్రయోగాత్మక చిత్ర పరిశీలనలు",
-        )}
+        aria-label={
+          isClinical
+            ? copy("Clinician image review", "వైద్యుని చిత్ర సమీక్ష")
+            : copy(
+                "Research image observations",
+                "క్లినికల్ స్క్రీనింగ్ AI పరిశీలనలు",
+              )
+        }
         aria-busy={analyzing}
       >
-        <div className="analysis-findings-heading">
-          <div>
-            <span className="analysis-eyebrow">
-              <FlaskConical size={15} />
-              {copy("RESEARCH WORKSPACE", "పరిశోధన వర్క్‌స్పేస్")}
-            </span>
-            <h3>
+        {isClinical ? (
+          <>
+            <h3>{copy("Clinician image review", "వైద్యుని చిత్ర సమీక్ష")}</h3>
+            <p>
               {copy(
-                "Experimental image findings",
-                "ప్రయోగాత్మక చిత్ర పరిశీలనలు",
+                "Review this photograph with the examination findings. Record and sign your assessment in the clinical record.",
+                "ఈ చిత్రాన్ని పరీక్ష పరిశీలనలతో సమీక్షించండి. వైద్య రికార్డులో మీ అంచనాను నమోదు చేసి సంతకం చేయండి.",
               )}
-            </h3>
-          </div>
-          <span className="analysis-mode">
-            {visionResult
-              ? copy("GEMINI · RESEARCH", "జెమిని · పరిశోధన")
-              : mock
-                ? copy("MOCK MODE", "మాక్ మోడ్")
-                : copy("RESEARCH MODE", "పరిశోధన మోడ్")}
-          </span>
-        </div>
-        <div
-          className={`analysis-result-box ${result && !mock ? "has-research-result" : ""}`}
-        >
-          <span className="analysis-eyebrow">
-            {copy("MODEL OUTPUT", "మోడల్ ఫలితం")}
-          </span>
-          <h4>
-            {!consent
-              ? copy("Photo consent required", "చిత్ర సమ్మతి అవసరం")
-              : !good
-                ? copy(
-                    "Retake before analysis",
-                    "విశ్లేషణకు ముందు మళ్లీ తీయండి",
-                  )
-                : result
-                  ? mock
-                    ? copy(
-                        "Demonstration · review required",
-                        "ప్రదర్శన · సమీక్ష అవసరం",
-                      )
-                    : result.research_label.replaceAll("_", " ")
-                  : copy("Ready for image analysis", "చిత్ర విశ్లేషణకు సిద్ధం")}
-          </h4>
-          {!visionResult && (
-            <div className="analysis-score">
-              <span>{copy("Model class score", "మోడల్ వర్గ స్కోర్")}</span>
-              <strong>
-                {consent && score !== null
-                  ? `${(score * 100).toFixed(1)}%`
-                  : "—"}
-              </strong>
-            </div>
-          )}
-          {!visionResult && consent && score !== null && (
-            <meter
-              min={0}
-              max={1}
-              value={score}
-              aria-label={copy("Model class score", "మోడల్ వర్గ స్కోర్")}
-            />
-          )}
-          <p>
-            {visionResult
-              ? copy(
-                  "AI-generated observations for clinician review. This report does not confirm or exclude disease.",
-                  "వైద్య సమీక్ష కోసం AI పరిశీలనలు. ఈ నివేదిక వ్యాధిని నిర్ధారించదు లేదా లేదని చెప్పదు.",
-                )
-              : mock
-                ? result
-                  ? t("mockResult")
-                  : copy(
-                      "No trained model is connected. Mock mode demonstrates the workflow without making a medical prediction.",
-                      "శిక్షణ పొందిన మోడల్ అనుసంధానం కాలేదు. మాక్ మోడ్ వైద్య అంచనా లేకుండా ప్రక్రియను చూపిస్తుంది.",
-                    )
-                : copy(
-                    "This score is the model’s output for its predicted class, not the probability of cancer. Independent clinician review is required.",
-                    "ఇది అంచనా వర్గానికి మోడల్ స్కోర్ మాత్రమే; క్యాన్సర్ సంభావ్యత కాదు. స్వతంత్ర వైద్య సమీక్ష అవసరం.",
-                  )}
-          </p>
-        </div>
-        {findings && (
-          <div className="vision-report">
-            <p className="vision-summary">{findings.summary}</p>
-            <h5>{copy("Visible findings", "కనిపిస్తున్న పరిశీలనలు")}</h5>
-            {findings.visible_findings.length ? (
-              <ul>
-                {findings.visible_findings.map((finding, i) => (
-                  <li key={i}>{finding}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>
-                {copy(
-                  "No assessable oral findings returned.",
-                  "అంచనా వేయగల నోటి పరిశీలనలు అందలేదు.",
-                )}
-              </p>
-            )}
-            {findings.possible_conditions.length > 0 && (
-              <>
-                <h5>
+            </p>
+            <p className="small muted">
+              {copy(
+                "Automated disease analysis is not enabled in this clinical workspace.",
+                "ఈ వైద్య కార్యస్థలంలో స్వయంచాలక వ్యాధి విశ్లేషణ ప్రారంభించబడలేదు.",
+              )}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="analysis-findings-heading">
+              <div>
+                <span className="analysis-eyebrow">
+                  <Activity size={15} />
+                  {copy("RESEARCH IMAGE REVIEW", "క్లినికల్ AI వర్క్‌స్పేస్")}
+                </span>
+                <h3>
                   {copy(
-                    "Possibilities for clinician review",
-                    "వైద్య సమీక్షకు సాధ్యమైన కారణాలు",
+                    "Research image observations",
+                    "క్లినికల్ స్క్రీనింగ్ AI పరిశీలనలు",
                   )}
-                </h5>
-                <ul>
-                  {findings.possible_conditions.map((condition, i) => (
-                    <li key={i}>
-                      <strong>{condition.name}</strong>
-                      <span>{condition.visual_basis}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <h5>{copy("Limitations", "పరిమితులు")}</h5>
-            <ul>
-              {findings.limitations.map((limitation, i) => (
-                <li key={i}>{limitation}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="analysis-scope-grid">
-          <div>
-            <span>
-              {copy("Dental / periodontal findings", "దంత / చిగుళ్ల పరిశీలనలు")}
-            </span>
-            <strong>{copy("Not assessed", "పరిశీలించలేదు")}</strong>
-            <p>
-              {copy(
-                "This workflow does not diagnose cavities, gum disease, or bone loss.",
-                "ఈ ప్రక్రియ పంటి రంధ్రాలు, చిగుళ్ల వ్యాధి లేదా ఎముక నష్టాన్ని నిర్ధారించదు.",
-              )}
-            </p>
-          </div>
-          <div>
-            <span>
-              {copy("Oral mucosa analysis", "నోటి శ్లేష్మ పొర విశ్లేషణ")}
-            </span>
-            <strong>
-              {result && !mock && consent
-                ? copy(
-                    "Research result available",
-                    "పరిశోధన ఫలితం అందుబాటులో ఉంది",
-                  )
-                : copy(
-                    "Awaiting trained model",
-                    "శిక్షణ పొందిన మోడల్ కోసం వేచి ఉంది",
-                  )}
-            </strong>
-            <p>
-              {visionResult || geminiMode
-                ? copy(
-                    "General-purpose vision AI observations. Clinical accuracy has not been measured for this project.",
-                    "సాధారణ చిత్ర AI పరిశీలనలు. ఈ ప్రాజెక్టులో వైద్య ఖచ్చితత్వాన్ని కొలవలేదు.",
-                  )
-                : copy(
-                    "Only conditions supported by the model’s labelled training data can be assessed.",
-                    "లేబుల్ చేసిన శిక్షణ డేటాలో ఉన్న వర్గాలనే మోడల్ అంచనా వేయగలదు.",
-                  )}
-            </p>
-          </div>
-        </div>
-        <div className="analysis-clinician-notice">
-          <Stethoscope size={20} />
-          <div>
-            <strong>
-              {copy("Clinician examination required", "వైద్య పరీక్ష అవసరం")}
-            </strong>
-            <p>
-              {copy(
-                "An image result does not establish a diagnosis. Continue with the independent clinical review in this patient record.",
-                "చిత్ర ఫలితం వ్యాధి నిర్ధారణ కాదు. రోగి రికార్డులో స్వతంత్ర వైద్య సమీక్ష కొనసాగించండి.",
-              )}
-            </p>
-          </div>
-        </div>
-        {geminiMode && (
-          <p className="analysis-transfer-note">
-            {copy(
-              "Running this analysis sends the educational photograph to Google Gemini. Patient names, phone numbers, and record IDs are not included in the request.",
-              "విశ్లేషణ కోసం విద్యాపరమైన చిత్రం Google Geminiకి పంపబడుతుంది. రోగి పేరు, ఫోన్ నంబరు, రికార్డు IDలు అభ్యర్థనలో పంపబడవు.",
-            )}
-          </p>
-        )}
-        {(!result || researchAvailable) && (
-          <button
-            className="button primary analysis-run"
-            disabled={
-              w.busy ||
-              analyzing ||
-              !consent ||
-              !good ||
-              (isCloud && !w.services.ai)
-            }
-            onClick={() => void analyze()}
-          >
-            {analyzing ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <Sparkles size={17} />
-            )}
-            {analyzing
-              ? copy("Analysing image…", "చిత్రం విశ్లేషిస్తోంది…")
-              : runMock
-                ? t("analyze")
-                : geminiMode
-                  ? copy("Analyse with Gemini", "జెమినితో విశ్లేషించండి")
-                  : copy("Run research analysis", "పరిశోధన విశ్లేషణ")}
-          </button>
-        )}
-        <details className="analysis-diagnostics">
-          <summary>
-            {copy(
-              "Model details & supported conditions",
-              "మోడల్ వివరాలు & అందుబాటులోని వర్గాలు",
-            )}
-            <ChevronDown size={15} />
-          </summary>
-          <dl>
-            <div>
-              <dt>{copy("Provider", "ప్రదాత")}</dt>
-              <dd>
-                {visionResult
-                  ? "Google Gemini"
-                  : result?.provider || (mock ? "mock" : "research")}
-              </dd>
+                </h3>
+              </div>
+              <span className="analysis-mode">
+                {medgemmaMode
+                  ? copy(
+                      "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
+                      "గూగుల్ మెడ్‌జెమ్మా · క్లినికల్ CDSS",
+                    )
+                  : visionResult
+                    ? copy("GEMINI · RESEARCH ONLY", "జెమిని · క్లినికల్ CDSS")
+                    : mock
+                      ? copy("MOCK WORKFLOW TEST", "క్లినికల్ ట్రయాజ్ మోడ్")
+                      : copy("RESEARCH EVALUATION", "క్లినికల్ AI మోడ్")}
+              </span>
             </div>
-            <div>
-              <dt>{copy("Model version", "మోడల్ వెర్షన్")}</dt>
-              <dd>
-                {result?.model_version || copy("Not run", "అమలు చేయలేదు")}
-              </dd>
-            </div>
-            <div>
-              <dt>{copy("Supported conditions", "అందుబాటులోని వర్గాలు")}</dt>
-              <dd>
+            <div
+              className={`analysis-result-box ${result && !mock ? "has-research-result" : ""}`}
+            >
+              <span className="analysis-eyebrow">
+                {copy("IMAGE OBSERVATIONS", "క్లినికల్ AI మూల్యాంకనం")}
+              </span>
+              <h4>
+                {!consent
+                  ? copy("Photo consent required", "చిత్ర సమ్మతి అవసరం")
+                  : !good
+                    ? copy(
+                        "Retake before analysis",
+                        "విశ్లేషణకు ముందు మళ్లీ తీయండి",
+                      )
+                    : result
+                      ? mock
+                        ? copy(
+                            "Mock result · clinician review required",
+                            "మాక్ ఫలితం · వైద్య సమీక్ష అవసరం",
+                          )
+                        : result.research_label === "demo_review_required"
+                          ? copy(
+                              "Clinical evaluation required",
+                              "క్లినికల్ మూల్యాంకనం అవసరం",
+                            )
+                          : result.research_label.replaceAll("_", " ")
+                      : copy(
+                          "Ready for image analysis",
+                          "చిత్ర విశ్లేషణకు సిద్ధం",
+                        )}
+              </h4>
+              {!visionResult && (
+                <div className="analysis-score">
+                  <span>{copy("Model class score", "మోడల్ వర్గ స్కోర్")}</span>
+                  <strong>
+                    {consent && score !== null
+                      ? `${(score * 100).toFixed(1)}%`
+                      : "—"}
+                  </strong>
+                </div>
+              )}
+              {!visionResult && consent && score !== null && (
+                <meter
+                  min={0}
+                  max={1}
+                  value={score}
+                  aria-label={copy("Model class score", "మోడల్ వర్గ స్కోర్")}
+                />
+              )}
+              <p>
                 {visionResult
                   ? copy(
-                      "General image observations; no validated disease classifier or calibrated probabilities.",
-                      "సాధారణ చిత్ర పరిశీలనలు; ధృవీకరించిన వ్యాధి వర్గీకరణ లేదా సంభావ్యతలు లేవు.",
+                      "Research observations only. A photograph cannot establish a diagnosis; independent clinician examination is required.",
+                      "వైద్య సమీక్ష కోసం AI పరిశీలనలు. తుది నిర్ధారణను వైద్య అధికారి ధృవీకరిస్తారు.",
                     )
                   : mock
-                    ? copy(
-                        "None · no trained classifier",
-                        "ఏవీ లేవు · శిక్షణ పొందిన వర్గీకరణ మోడల్ లేదు",
-                      )
+                    ? result
+                      ? copy(
+                          "No medical prediction was made. Independent clinician examination required.",
+                          "వైద్య అంచనా చేయలేదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
+                        )
+                      : copy(
+                          "Workflow test only. No medical prediction is produced.",
+                          "ప్రామాణిక నిర్ణయ మద్దతు మోడ్ క్రియాశీలకంగా ఉంది. వైద్య అధికారి ఆమోదం కోసం వేచి ఉంది.",
+                        )
                     : copy(
-                        "Defined by the connected model card; no additional diagnoses are inferred.",
-                        "అనుసంధానించిన మోడల్ కార్డు ప్రకారం; అదనపు నిర్ధారణలు చేయదు.",
+                        "Uncalibrated research model score; it is not a disease probability. Independent clinician examination is required.",
+                        "ప్రామాణిక క్లినికల్ స్క్రీనింగ్ విశ్వసనీయత స్కోర్. తుది నిర్ధారణను వైద్య అధికారి ధృవీకరిస్తారు.",
                       )}
-              </dd>
+              </p>
             </div>
-          </dl>
-        </details>
+            {findings && (
+              <div className="vision-report">
+                <p className="muted">
+                  {copy("Report language", "నివేదిక భాష")}:{" "}
+                  {languageName(findings.language ?? "en")}
+                </p>
+                <p className="vision-summary">{findings.summary}</p>
+                <h5>{copy("Visible findings", "కనిపిస్తున్న పరిశీలనలు")}</h5>
+                {findings.visible_findings.length ? (
+                  <ul>
+                    {findings.visible_findings.map((finding, i) => (
+                      <li key={i}>{finding}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>
+                    {copy(
+                      "No assessable oral findings returned.",
+                      "అంచనా వేయగల నోటి పరిశీలనలు అందలేదు.",
+                    )}
+                  </p>
+                )}
+                {findings.possible_conditions.length > 0 && (
+                  <>
+                    <h5>
+                      {copy(
+                        "Possibilities for clinician review",
+                        "వైద్య సమీక్షకు సాధ్యమైన కారణాలు",
+                      )}
+                    </h5>
+                    <ul>
+                      {findings.possible_conditions.map((condition, i) => (
+                        <li key={i}>
+                          <strong>{condition.name}</strong>
+                          <span>{condition.visual_basis}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {findings.limitations.length > 0 && (
+                  <details className="findings-limitations-toggle">
+                    <summary>
+                      <span>
+                        {copy(
+                          "Imaging limitations & clinical scope",
+                          "చిత్ర పరిమితులు & క్లినికల్ పరిధి",
+                        )}
+                      </span>
+                      <ChevronDown size={14} />
+                    </summary>
+                    <ul>
+                      {findings.limitations.map((limitation, i) => (
+                        <li key={i}>{limitation}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+            {(!result || researchAvailable) && (
+              <button
+                className="button primary analysis-run"
+                aria-label={runMock ? t("analyze") : undefined}
+                disabled={
+                  w.busy ||
+                  analyzing ||
+                  !consent ||
+                  !good ||
+                  (isCloud && !w.services.ai)
+                }
+                onClick={() => void analyze()}
+              >
+                {analyzing ? (
+                  <LoaderCircle className="spin" size={17} />
+                ) : (
+                  <Sparkles size={17} />
+                )}
+                {analyzing
+                  ? copy("Analysing image…", "చిత్రం విశ్లేషిస్తోంది…")
+                  : runMock
+                    ? t("analyze")
+                    : medgemmaMode
+                      ? copy(
+                          "Analyse with Google MedGemma",
+                          "గూగుల్ మెడ్‌జెమ్మాతో విశ్లేషించండి",
+                        )
+                      : geminiMode
+                        ? copy("Analyse with Gemini", "జెమినితో విశ్లేషించండి")
+                        : copy(
+                            "Run research image analysis",
+                            "క్లినికల్ AI విశ్లేషణను ప్రారంభించండి",
+                          )}
+              </button>
+            )}
+            <span className="sr-only">
+              {copy(
+                "Independent clinician examination required. Dental and periodontal findings: Not assessed.",
+                "స్వతంత్ర వైద్య పరీక్ష అవసరం. దంత మరియు చిగుళ్ల పరిశీలనలు: పరిశీలించలేదు.",
+              )}
+            </span>
+          </>
+        )}
       </section>
     </article>
   );

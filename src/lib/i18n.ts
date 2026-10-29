@@ -1,4 +1,17 @@
+import { localize } from "./localize.ts";
 import type { Language, Role } from "./types";
+export function oralViewLabel(value: string, language: Language) {
+  const views: Record<string, [string, string]> = {
+    cheek: ["Cheek", "చెంప"],
+    tongue: ["Tongue", "నాలుక"],
+    palate: ["Palate", "అంగిలి"],
+    gums: ["Gums", "చిగుళ్లు"],
+    floor_of_mouth: ["Floor of mouth", "నోటి అడుగు భాగం"],
+  };
+  return views[value]
+    ? localize(language, ...views[value])
+    : value.replaceAll("_", " ");
+}
 export const labels = {
   duplicateWarning: [
     "Possible existing record among your assigned patients. Check before registering another person:",
@@ -255,16 +268,63 @@ export const labels = {
   menu: ["Open navigation", "మెనూ తెరవండి"],
 } as const;
 export type Label = keyof typeof labels;
-export const translator = (language: Language) => (key: Label) =>
-  labels[key][language === "te" ? 1 : 0];
+export const clinicalLabels: Partial<Record<Label, readonly [string, string]>> =
+  {
+    name: ["Full name", "పూర్తి పేరు"],
+    quickText: [
+      "Register a patient and start a screening.",
+      "రోగిని నమోదు చేసి పరీక్ష ప్రారంభించండి.",
+    ],
+    cloud: ["Clinical workspace", "వైద్య కార్యస్థలం"],
+    photoConsent: [
+      "Consent for oral photographs recorded",
+      "నోటి చిత్రాల కోసం సమ్మతి నమోదు చేశాను",
+    ],
+    consentHelp: [
+      "Explain the screening and record the patient's consent before continuing.",
+      "కొనసాగించే ముందు పరీక్ష గురించి వివరించి రోగి సమ్మతిని నమోదు చేయండి.",
+    ],
+    noPhotos: ["No oral photographs attached", "నోటి చిత్రాలు జత చేయలేదు"],
+    capture: [
+      "Capture / upload oral photograph",
+      "నోటి చిత్రం తీయండి / అప్‌లోడ్ చేయండి",
+    ],
+    photoHelp: [
+      "JPEG, PNG or WebP · up to 10 MB · patient consent required",
+      "JPEG, PNG లేదా WebP · 10 MB వరకు · రోగి సమ్మతి అవసరం",
+    ],
+    reviewNote: [
+      "Record your examination findings and sign your decision. Signed reviews are retained.",
+      "పరీక్ష పరిశీలనలను నమోదు చేసి నిర్ణయంపై సంతకం చేయండి. సంతకం చేసిన సమీక్షలు భద్రపరుస్తాం.",
+    ],
+    diagnosis: ["Clinician-entered diagnosis", "వైద్యుడు నమోదు చేసిన నిర్ధారణ"],
+    pathology: ["Diagnostic investigations", "నిర్ధారణ పరీక్షలు"],
+    saveOutcome: ["Save diagnostic outcome", "నిర్ధారణ ఫలితాన్ని సేవ్ చేయండి"],
+    draftSaved: [
+      "Changes held for this session",
+      "ఈ సెషన్‌లో మార్పులు ఉంచబడ్డాయి",
+    ],
+    drafts: ["Pending submissions", "పెండింగ్ సమర్పణలు"],
+    cloudHelp: [
+      "Contact your workspace administrator for connection and staff access settings.",
+      "కనెక్షన్ మరియు సిబ్బంది ప్రవేశ సెట్టింగ్‌ల కోసం నిర్వాహకుడిని సంప్రదించండి.",
+    ],
+  };
+export const translator =
+  (language: Language, clinical = false) =>
+  (key: Label) => {
+    const pair = clinical ? (clinicalLabels[key] ?? labels[key]) : labels[key];
+    return localize(language, pair[0], pair[1]);
+  };
+const roleNames = {
+  health_worker: ["Health worker", "ఆరోగ్య కార్యకర్త"],
+  medical_officer: ["Medical officer", "వైద్య అధికారి"],
+  specialist: ["Specialist", "నిపుణుడు"],
+  navigator: ["Care navigator", "సంరక్షణ సమన్వయకర్త"],
+  district_admin: ["District admin", "జిల్లా అధికారి"],
+};
 export const roleLabel = (role: Role, language: Language) =>
-  ({
-    health_worker: ["Health worker", "ఆరోగ్య కార్యకర్త"],
-    medical_officer: ["Medical officer", "వైద్య అధికారి"],
-    specialist: ["Specialist", "నిపుణుడు"],
-    navigator: ["Care navigator", "సంరక్షణ సమన్వయకర్త"],
-    district_admin: ["District admin", "జిల్లా అధికారి"],
-  })[role][language === "te" ? 1 : 0];
+  localize(language, roleNames[role][0], roleNames[role][1]);
 export function statusLabel(status: string, language: Language) {
   const map: Record<string, [string, string]> = {
     assessed: ["Consultation completed", "సంప్రదింపు పూర్తయింది"],
@@ -299,7 +359,7 @@ export function statusLabel(status: string, language: Language) {
     transport: ["Transport", "రవాణా"],
     contact: ["Contact", "సంప్రదింపు"],
   };
-  return (
-    map[status]?.[language === "te" ? 1 : 0] ?? status.replaceAll("_", " ")
-  );
+  return map[status]
+    ? localize(language, map[status][0], map[status][1])
+    : status.replaceAll("_", " ");
 }

@@ -7,7 +7,7 @@ Keep its database password securely. These files assume a new project without
 existing application tables or Storage policies.
 
 For a new project, open [setup.sql](../supabase/setup.sql), copy the entire file into
-SQL Editor, and run it as `postgres`. It includes all six migrations and the facility
+SQL Editor, and run it as `postgres`. It includes all ten migrations and the facility
 seed in one transaction. Run it once; it refuses to overwrite an existing application
 schema. Regenerate the file after migration changes with `npm run db:prepare`.
 
@@ -19,13 +19,32 @@ the combined setup file):
 3. [Authenticated workflow API](../supabase/migrations/202610260003_workflow_api.sql)
 4. [Care workflows and integration API](../supabase/migrations/202610270004_care_workflows.sql)
 5. [Patient journey, decisions and closure](../supabase/migrations/202610280005_patient_journey.sql)
-6. [Structured image findings](../supabase/migrations/202610290008_image_findings.sql)
-7. [Synthetic facilities](../supabase/seed.sql)
+6. [Privileged MFA enforcement](../supabase/migrations/202610280006_privileged_mfa.sql)
+7. [Structured worker screening intake](../supabase/migrations/202610290007_screening_intake.sql)
+8. [Vision-model image findings](../supabase/migrations/202610290008_image_findings.sql)
+9. [Additional patient and consent languages](../supabase/migrations/202610290009_languages.sql)
+10. [Clinical workspace and record separation](../supabase/migrations/202610300010_clinical_workspace.sql)
+11. [Synthetic facilities](../supabase/seed.sql)
 
 Apply only migrations that are not already applied. Migrations
 run once in transactions; seeds are repeatable. Keep `app_private` out of the Data
 API exposed schemas. If adopting CLI migrations later, baseline their history to
 match the files already applied manually.
+
+For an existing project, apply any missing migrations in order. Migration 006
+enforces authenticator verification for clinician and administrator accounts; see
+[the security update](SECURITY_UPDATE.md). Migration 007 stores the new worker
+habit checklists, symptoms, and measurements. Apply it before using the updated
+screening form in Supabase mode. The form keeps its draft and refuses submission
+when that database update is unavailable. Existing staff accounts and historical
+screenings are retained; unrecorded historical findings display as not assessed
+or not recorded.
+
+Migration 008 adds structured image findings for Gemini. Apply it before enabling
+Gemini analysis; the API checks its presence before sending a photo to Google.
+
+Migration 009 enables the seven additional patient and consent languages. Apply
+it before registering patients with these preferences; see [languages](LANGUAGES.md).
 
 ```sql
 select tablename, rowsecurity from pg_tables

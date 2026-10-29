@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { before, after, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { registerCareTests } from "./database-care.mjs";
+import { registerRecoveryTests } from "./database-recovery.mjs";
 
 const db = new PGlite();
 const sqlFile = (path) =>
@@ -24,6 +25,9 @@ before(async () => {
     create table auth.users (id uuid primary key, email text unique);
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+    $$;
+    create function auth.jwt() returns jsonb language sql stable as $$
+      select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb;
     $$;
     grant usage on schema auth, public to anon, authenticated, service_role;
     grant execute on function auth.uid() to anon, authenticated, service_role;
@@ -54,8 +58,18 @@ before(async () => {
       await sqlFile("supabase/migrations/202610280005_patient_journey.sql"),
     );
     await db.exec(
+      await sqlFile("supabase/migrations/202610280006_privileged_mfa.sql"),
+    );
+    await db.exec(
+      await sqlFile("supabase/migrations/202610290007_screening_intake.sql"),
+    );
+    await db.exec(
       await sqlFile("supabase/migrations/202610290008_image_findings.sql"),
     );
+    await db.exec(
+      await sqlFile("supabase/migrations/202610290009_languages.sql"),
+    );
+    await db.exec(await sqlFile("supabase/migrations/202610300010_clinical_workspace.sql"));
   }
   for (const [index, name] of [
     "worker",
@@ -94,12 +108,15 @@ before(async () => {
 });
 after(async () => db.close());
 
-async function asRole(role, userId, run) {
+async function asRole(role, userId, run, assurance = "aal2") {
   await db.exec("begin");
   try {
     await db.exec(`set local role ${role}`); // role is a test constant, never user input.
     await db.query("select set_config('request.jwt.claim.sub', $1, true)", [
       userId ?? "",
+    ]);
+    await db.query("select set_config('request.jwt.claims', $1, true)", [
+      JSON.stringify({ sub: userId, aal: assurance }),
     ]);
     return await run();
   } finally {
@@ -130,6 +147,91 @@ test("anonymous requests cannot read patient data or dashboard totals", async ()
   await denied(() =>
     asRole("anon", null, () => db.query("select public.dashboard_summary()")),
   );
+});
+
+test("privileged AAL1 sessions can reach enrollment but cannot read records or invoke workflows", async () => {
+  for (const actor of [uid(2), uid(3), uid(5)]) {
+    await asRole(
+      "authenticated",
+      actor,
+      async () => {
+        assert.equal(
+          await count("profiles"),
+          1,
+          "Own profile remains available for enrollment",
+        );
+        for (const table of [
+          "patients",
+          "screenings",
+          "consents",
+          "patient_assignments",
+          "images",
+          "clinical_reviews",
+          "referrals",
+          "appointments",
+          "investigations",
+          "treatments",
+          "patient_documents",
+          "care_decisions",
+          "outreach_events",
+        ])
+          assert.equal(await count(table), 0, table);
+        assert.equal(
+          (await db.query("select public.security_policy() as policy")).rows[0]
+            .policy.privileged_mfa,
+          true,
+        );
+      },
+      "aal1",
+    );
+    await denied(() =>
+      asRole(
+        "authenticated",
+        actor,
+        () =>
+          db.query("select public.submit_workflow($1,'outreach','{}'::jsonb)", [
+            crypto.randomUUID(),
+          ]),
+        "aal1",
+      ),
+    );
+    await denied(() =>
+      asRole(
+        "authenticated",
+        actor,
+        () => db.query("select public.dashboard_summary()"),
+        "aal1",
+      ),
+    );
+  }
+});
+
+test("MFA wrapper implementations are not callable by authenticated or service roles", async () => {
+  for (const actorRole of ["authenticated", "service_role"]) {
+    await denied(() =>
+      asRole(actorRole, uid(2), () =>
+        db.query(
+          "select public.submit_workflow_without_mfa($1,'outreach','{}'::jsonb)",
+          [crypto.randomUUID()],
+        ),
+      ),
+    );
+    await denied(() =>
+      asRole(actorRole, uid(5), () =>
+        db.query("select public.dashboard_summary_without_mfa()"),
+      ),
+    );
+  }
+});
+
+test("worker and navigator retain AAL1 access to assigned records", async () => {
+  for (const actor of [uid(1), uid(4)])
+    await asRole(
+      "authenticated",
+      actor,
+      async () => assert.equal(await count("patients"), 12),
+      "aal1",
+    );
 });
 
 test("assigned worker can read their patients and screening images", async () => {
@@ -326,6 +428,38 @@ test("AI cannot claim clinical use or skip clinician review", async () => {
   }
 });
 
+test("vision findings persist only as research observations with no numeric confidence", async () => {
+  await asRole("service_role", uid(1), async () => {
+    const findings = {
+      engine: "gemini",
+      image_kind: "not_oral_photo",
+      summary: "Synthetic observation fixture",
+      visible_findings: [],
+      possible_conditions: [],
+      limitations: ["Test only"],
+    };
+    const { rows } = await db.query(
+      "insert into public.ai_analyses(image_id,provider,model_version,status,research_label,score,findings) values ($1,'research','gemini-fixture','completed','not_an_oral_photo',null,$2) returning findings,clinical_use,requires_clinician_review",
+      [image, findings],
+    );
+    assert.deepEqual(rows[0].findings, findings);
+    assert.equal(rows[0].clinical_use, false);
+    assert.equal(rows[0].requires_clinician_review, true);
+  });
+  await invalid(() =>
+    db.query(
+      "insert into public.ai_analyses(image_id,provider,model_version,status,score,findings) values ($1,'research','invalid','completed',0.9,$2)",
+      [image, { engine: "gemini" }],
+    ),
+  );
+  await invalid(() =>
+    db.query(
+      "insert into public.ai_analyses(image_id,provider,model_version,status,score,findings) values ($1,'mock','invalid','completed',null,$2)",
+      [image, { engine: "gemini" }],
+    ),
+  );
+});
+
 test("patient and pathology records must remain explicitly synthetic", async () => {
   await invalid(() =>
     db.exec("update public.patients set is_synthetic = false"),
@@ -395,6 +529,70 @@ const rpc = (action, payload, requestId = crypto.randomUUID()) =>
   ]);
 
 registerCareTests({ db, asRole, rpc, uid, patient, denied });
+registerRecoveryTests({ db, uid });
+
+test("structured screening intake survives RPC retries with numeric measurements", async () => {
+  await asRole("authenticated", uid(1), async () => {
+    const payload = {
+      ...registrationPayload(),
+      tobacco: "current",
+      habits: ["reverse_smoking", "alcohol"],
+      duration_years: "15",
+      frequency_per_day: "8",
+      reported_symptoms: ["burning"],
+      mouth_opening_mm: "32",
+      lymph_nodes: "palpable",
+    };
+    const request = crypto.randomUUID();
+    await rpc("register", payload, request);
+    await rpc("register", payload, request);
+    const { rows } = await db.query(
+      "select symptoms,tobacco_history from public.screenings where patient_id=$1",
+      [payload.patient_id],
+    );
+    assert.equal(rows.length, 1);
+    assert.deepEqual(rows[0].symptoms, {
+      discomfort: false,
+      reported: ["burning"],
+      mouth_opening_mm: 32,
+      lymph_nodes: "palpable",
+    });
+    assert.deepEqual(rows[0].tobacco_history, {
+      use: "current",
+      habits: ["reverse_smoking", "alcohol"],
+      duration_years: 15,
+      frequency_per_day: 8,
+    });
+  });
+});
+
+test("invalid intake values roll back patient, consent, and request records", async () => {
+  for (const extra of [
+    { mouth_opening_mm: -1 },
+    { duration_years: 121 },
+    { frequency_per_day: "NaN" },
+    { mouth_opening_mm: true },
+    { habits: ["invented"] },
+    { reported_symptoms: "burning" },
+    { lymph_nodes: "normal" },
+  ]) {
+    const payload = { ...registrationPayload(), ...extra };
+    const before = await count("patients");
+    await assert.rejects(() =>
+      asRole("authenticated", uid(1), () => rpc("register", payload)),
+    );
+    assert.equal(await count("patients"), before);
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from public.consents where patient_id=$1",
+          [payload.patient_id],
+        )
+      ).rows[0].n,
+      0,
+    );
+  }
+});
 
 test("registration RPC atomically creates consent, screening and care-team assignments", async () => {
   await asRole("authenticated", uid(1), async () => {
@@ -433,6 +631,26 @@ test("registration retry returns the same result without duplicate records", asy
       1,
     );
   });
+});
+
+test("registration preserves each additional patient and consent language", async () => {
+  for (const language of ["hi", "ta", "kn", "ml", "mr", "bn", "or"]) {
+    await asRole("authenticated", uid(1), async () => {
+      const payload = { ...registrationPayload(), language };
+      await rpc("register", payload);
+      const patients = await db.query(
+        "select preferred_language from public.patients where id=$1",
+        [payload.patient_id],
+      );
+      assert.equal(patients.rows[0].preferred_language, language);
+      const consents = await db.query(
+        "select language from public.consents where patient_id=$1",
+        [payload.patient_id],
+      );
+      assert.equal(consents.rows.length, 2);
+      assert.ok(consents.rows.every((row) => row.language === language));
+    });
+  }
 });
 
 test("request ID cannot be reused with a different payload", async () => {

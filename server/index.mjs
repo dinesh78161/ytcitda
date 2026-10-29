@@ -4,7 +4,12 @@ import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { createStaticHandler } from "./static.mjs";
 import { storePrivateUpload } from "./private-upload.mjs";
-import { analyzeWithGemini, GEMINI_DEFAULT_MODEL } from "./gemini.mjs";
+import { enforceVerifiedAssurance } from "./security.mjs";
+import {
+  analyzeWithGemini,
+  GEMINI_DEFAULT_MODEL,
+  MEDGEMMA_DEFAULT_MODEL,
+} from "./gemini.mjs";
 import { AccessToken, TrackSource } from "livekit-server-sdk";
 import {
   HttpError,
@@ -31,6 +36,13 @@ export function createServices(
   const configured = Boolean(
     env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.SUPABASE_SECRET_KEY,
   );
+  const clinical = env.WORKSPACE_MODE === "clinical";
+  requireValue(
+    !env.WORKSPACE_MODE ||
+      ["evaluation", "clinical"].includes(env.WORKSPACE_MODE),
+    503,
+    "WORKSPACE_MODE must be evaluation or clinical.",
+  );
   const admin = configured
     ? clientFactory(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
         auth: { persistSession: false, autoRefreshToken: false },
@@ -39,14 +51,16 @@ export function createServices(
   const aiMode =
     env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
   requireValue(
-    ["mock", "research", "gemini", "disabled"].includes(aiMode),
+    ["mock", "research", "gemini", "medgemma", "disabled"].includes(aiMode),
     503,
-    "SCREENING_AI_MODE must be mock, research, gemini or disabled.",
+    "SCREENING_AI_MODE must be mock, research, gemini, medgemma or disabled.",
   );
   const aiEnabled =
+    !clinical &&
     configured &&
     (aiMode === "mock" ||
-      (aiMode === "gemini" && Boolean(env.GEMINI_API_KEY?.trim())) ||
+      ((aiMode === "gemini" || aiMode === "medgemma") &&
+        Boolean(env.GEMINI_API_KEY?.trim())) ||
       (aiMode === "research" &&
         !!(
           env.SCREENING_MODEL_URL &&
@@ -73,6 +87,7 @@ export function createServices(
     video_provider: videoEnabled ? videoProvider : "disabled",
     ai: aiEnabled,
     ai_provider: aiEnabled ? aiMode : "disabled",
+    workspace_mode: clinical ? "clinical" : "evaluation",
     reminders:
       configured &&
       env.REMINDER_DELIVERY_ENABLED === "true" &&
@@ -124,6 +139,15 @@ export function createServices(
       await user.from("profiles").select("*").eq("id", data.user.id).single(),
     );
     requireValue(profile?.active, 403, "An active staff profile is required.");
+    enforceVerifiedAssurance(token, data.user.id, profile);
+    if (clinical) {
+      const policy = checked(await user.rpc("workspace_policy"));
+      requireValue(
+        policy?.version === 1 && policy.mode === "clinical",
+        503,
+        "The clinical workspace database update is not available. Contact your workspace administrator.",
+      );
+    }
     return { user, profile };
   }
   const role = (ctx, roles) =>
@@ -136,10 +160,11 @@ export function createServices(
     requireValue(uuid(id), 400, "Invalid patient ID.");
     const { data, error } = await ctx.user
       .from("patients")
-      .select("id")
+      .select("id,is_synthetic")
       .eq("id", id)
       .maybeSingle();
     requireValue(!error && data, 403, "This patient is not assigned to you.");
+    return data;
   }
   async function consent(ctx, id, purpose) {
     const { data, error } = await ctx.user
@@ -392,7 +417,12 @@ export function createServices(
         .eq("id", body.image_id)
         .maybeSingle();
       requireValue(!error && image, 403, "Assigned image required.");
-      await patient(ctx, image.patient_id);
+      const record = await patient(ctx, image.patient_id);
+      requireValue(
+        record.is_synthetic === true,
+        403,
+        "Research AI is unavailable for clinical patient records. Clinician review remains available.",
+      );
       await consent(ctx, image.patient_id, "image_capture");
       requireValue(
         image.quality_status === "acceptable",
@@ -412,7 +442,7 @@ export function createServices(
           warning: "NOT FOR CLINICAL USE",
         };
       } else {
-        if (aiMode === "gemini") {
+        if (aiMode === "gemini" || aiMode === "medgemma") {
           const capability = await ctx.user.rpc("image_findings_policy");
           requireValue(
             !capability.error && capability.data?.version === 1,
@@ -423,12 +453,19 @@ export function createServices(
         const blob = checked(
           await admin.storage.from("oral-images").download(image.object_key),
         );
-        if (aiMode === "gemini") {
+        if (aiMode === "gemini" || aiMode === "medgemma") {
           result = await analyzeWithGemini({
             bytes: await blob.arrayBuffer(),
             key: env.GEMINI_API_KEY,
-            model: env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
+            model:
+              env.GEMINI_MODEL ||
+              env.MEDGEMMA_MODEL ||
+              (aiMode === "medgemma"
+                ? MEDGEMMA_DEFAULT_MODEL
+                : GEMINI_DEFAULT_MODEL),
+            language: body.language ?? "en",
             fetcher,
+            engine: aiMode === "medgemma" ? "medgemma" : "gemini",
           });
         } else {
           const raw = await remote(

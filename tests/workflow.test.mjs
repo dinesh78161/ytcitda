@@ -28,6 +28,88 @@ const payload = () => ({
   photo_consent: true,
   notes: "Synthetic intake",
 });
+
+test("demo registration retains all seven additional language choices", () => {
+  for (const language of ["hi", "ta", "kn", "ml", "mr", "bn", "or"]) {
+    const p = { ...payload(), language };
+    const data = applyDemoCommand(
+      createDemo(),
+      worker,
+      command(worker, "register", p),
+    );
+    assert.equal(
+      data.patients.find((patient) => patient.id === p.patient_id)
+        .preferred_language,
+      language,
+    );
+    assert.ok(
+      data.consents
+        .filter((consent) => consent.patient_id === p.patient_id)
+        .every((consent) => consent.language === language),
+    );
+  }
+});
+
+test("structured worker intake persists measurements and preserves unknown findings", () => {
+  const p = {
+    ...payload(),
+    tobacco: "former",
+    habits: ["reverse_smoking", "alcohol"],
+    duration_years: "15",
+    frequency_per_day: "8",
+    reported_symptoms: ["burning"],
+    mouth_opening_mm: "32",
+    lymph_nodes: "not_assessed",
+  };
+  const data = applyDemoCommand(
+    createDemo(),
+    worker,
+    command(worker, "register", p),
+  );
+  const saved = data.screenings.find((s) => s.patient_id === p.patient_id);
+  assert.deepEqual(saved.tobacco_history, {
+    use: "former",
+    habits: ["reverse_smoking", "alcohol"],
+    duration_years: 15,
+    frequency_per_day: 8,
+  });
+  assert.deepEqual(saved.symptoms, {
+    discomfort: false,
+    reported: ["burning"],
+    mouth_opening_mm: 32,
+    lymph_nodes: "not_assessed",
+  });
+  const missing = payload();
+  const blank = applyDemoCommand(
+    createDemo(),
+    worker,
+    command(worker, "register", missing),
+  ).screenings.find((s) => s.patient_id === missing.patient_id);
+  assert.equal(blank.symptoms.mouth_opening_mm, null);
+  assert.equal(blank.symptoms.lymph_nodes, "not_assessed");
+});
+
+test("invalid screening measurements and selections are rejected without adding a patient", () => {
+  for (const extra of [
+    { mouth_opening_mm: -1 },
+    { duration_years: 121 },
+    { frequency_per_day: "NaN" },
+    { mouth_opening_mm: true },
+    { habits: ["invented"] },
+    { reported_symptoms: "burning" },
+    { lymph_nodes: "normal" },
+  ]) {
+    const original = createDemo();
+    assert.throws(() =>
+      applyDemoCommand(
+        original,
+        worker,
+        command(worker, "register", { ...payload(), ...extra }),
+      ),
+    );
+    assert.equal(original.patients.length, 12);
+  }
+});
 test("demo registration, clinician referral, appointment and outcome form one record", () => {
   let data = createDemo();
   const p = payload();

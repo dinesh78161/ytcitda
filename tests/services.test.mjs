@@ -19,6 +19,7 @@ test("unconfigured services stay disabled and reject authentication", async () =
     video_provider: "disabled",
     ai: false,
     ai_provider: "disabled",
+    workspace_mode: "evaluation",
     reminders: false,
   });
   await assert.rejects(
