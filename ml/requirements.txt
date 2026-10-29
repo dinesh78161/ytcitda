@@ -1,0 +1,6 @@
+# Install the matching torch/torchvision build for your CPU or GPU first:
+# https://pytorch.org/get-started/locally/
+torch>=2.6,<3
+torchvision>=0.21,<1
+Pillow>=11,<13
+scikit-learn>=1.5,<2

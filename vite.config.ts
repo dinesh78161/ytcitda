@@ -11,7 +11,8 @@ export default defineConfig({
       manifest: {
         name: "Aarogya Drishti",
         short_name: "Aarogya",
-        description: "Synthetic screening-to-care hackathon demonstration",
+        description:
+          "Community oral screening and teleconsultation clinical decision support system",
         theme_color: "#123f39",
         background_color: "#f5f7f5",
         display: "standalone",

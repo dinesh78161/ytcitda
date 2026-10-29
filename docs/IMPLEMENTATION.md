@@ -81,15 +81,21 @@ decisions. Decisions are append-only. Closed cases reject new care edits and upl
 AI remains optional and a mock result is never displayed as completed real analysis.
 See the [demo runbook](DEMO_RUNBOOK.md) for an end-to-end acceptance walkthrough.
 
-1. Configure hosted Supabase and verify each account's access through the Data API.
-2. Configure the Node API and test private image/report access against hosted Storage.
-3. Configure a free LiveKit Build project (or Daily) and test two accounts on separate devices; verify camera/microphone behavior.
+Hosted Supabase, five-role access, private image/report round trips, mock AI and
+two-browser LiveKit video were verified through Render for release `942f5b0`.
+See [release handoff](RELEASE_HANDOFF.md) and [test report](TEST_REPORT.md).
+
+1. Verify the team-held account passwords in the normal sign-in form.
+2. Complete the real Android installation, camera and offline-reconnect checks.
+3. Test the configured LiveKit call on a phone and laptop; verify physical camera/microphone behavior.
 4. Staff assignments currently use Supabase administration. Optional operational
    extensions include self-service staff administration and immediate provider-token revocation.
 5. Calibrate image-quality checks on licensed media. A research classifier remains
    optional and needs proper dataset splits, evaluation and model/dataset cards.
-6. Test real Android camera/installability, MFA, conflicts, backup/restore and recovery.
-7. Record the team's demonstration video and contribution statement using the
-   included architecture, runbook, known limitations and generated test evidence.
+6. Apply the tested privileged-MFA migration with project-owner access. Local/API
+   and real hosted Auth checks pass. Isolated encrypted PostgreSQL restore passed;
+   complete the hosted-project restore using a separate destination.
+7. Review the generated five-minute walkthrough and complete the team's real
+   contribution statement. See [the security update](SECURITY_UPDATE.md).
 
 Only synthetic data is permitted. This is not a complete clinical application.

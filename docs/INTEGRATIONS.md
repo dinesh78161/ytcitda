@@ -90,6 +90,18 @@ Provider contracts: [Daily private rooms](https://docs.daily.co/reference/rest-a
 
 ## Research oral-screening model
 
+To use an existing vision AI instead of training a custom classifier, follow
+[Gemini setup](GEMINI_SETUP.md). Set `SCREENING_AI_MODE=gemini`, add a private
+`GEMINI_API_KEY`, choose `GEMINI_MODEL`, and apply migration 008. Gemini returns
+structured image observations with `score=null`; it is not a validated diagnostic
+classifier. The app never substitutes mock findings when Gemini fails.
+
+The [oral-image training kit](../ml/README.md) provides dataset auditing,
+patient-disjoint splits, a transfer-learning script, held-out metrics, and a
+compatible inference adapter. No oral classifier has been trained or validated
+by this project. The photo workspace now shows image quality and model findings
+side by side; mock results never display a fabricated score.
+
 For the handbook, use `SCREENING_AI_MODE=mock`. It produces a persisted structured
 `mock-v1` response with `provider=mock`, `score=null`, `clinical_use=false` and
 `requires_clinician_review=true`. It makes no prediction and sends no photo to an

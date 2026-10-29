@@ -36,12 +36,30 @@ subjects, demographic validity or disease information. There is no train/test sp
 because no learning takes place. The app's SVG icon is project artwork; no patient
 photograph is bundled.
 
-The handbook mentions Mendeley dataset `mhjyrn35p4/2`. This project has not verified
-its license, label mapping, duplicate subjects, consent or permitted use and does not
-claim permission to redistribute it. A team using educational photos must keep a
-source/license record for every image used in the jury demonstration.
+The [Mendeley V2 dataset record](https://data.mendeley.com/datasets/mhjyrn35p4/2)
+was checked on 29 October 2026. It lists CC BY 4.0 and original photographs of
+165 benign and 158 malignant lesions, plus augmented copies. This project has not
+downloaded or trained on it, verified patient grouping or label ground truth, or
+established suitability for the target population. Keep a source/license record
+and attribution for each educational image. The [training kit](../ml/README.md)
+documents the unresolved grouping and evaluation requirements.
 
 ## Optional research model
+
+The [Gemini integration](GEMINI_SETUP.md) uses an existing general-purpose vision
+model for visible observations and possible conditions for clinician review. It
+has not been clinically evaluated by this project. Its results are stored as
+`provider=research` with `findings.engine=gemini`, exact returned model version,
+prompt version, `score=null`, and mandatory independent clinician review. It
+checks whether an input appears to be an oral photograph, but that check is not
+a validated oral-image detector. No sensitivity or specificity is claimed.
+
+The new `ml/` scripts prepare patient-disjoint splits, fine-tune a photograph
+classifier, save held-out evaluation metrics, and expose a versioned inference
+adapter. They are a training scaffold, not an evaluated oral model. Dataset audit
+tests use synthetic fixtures. PyTorch training/inference have not been executed
+in this workspace because no labelled oral dataset or PyTorch installation is
+available. No accuracy, sensitivity, or specificity result is claimed.
 
 Use `SCREENING_AI_MODE=research` only with an evaluated, pinned endpoint. Its contract
 and validation are in [INTEGRATIONS.md](INTEGRATIONS.md). Document the dataset source,

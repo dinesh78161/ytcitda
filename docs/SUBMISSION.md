@@ -2,6 +2,9 @@
 
 Demo URL: https://aarogya-drishti-om9g.onrender.com/
 
+Start with the [release handoff](RELEASE_HANDOFF.md) for verified release scope,
+evidence locations, presentation preparation and the remaining team actions.
+
 Use [HANDBOOK_CHECKLIST.md](HANDBOOK_CHECKLIST.md) as the honest completion record.
 The team must understand and explain the implementation, as required by the handbook.
 
@@ -20,7 +23,17 @@ private channel; never commit them. Each account requires an active profile and
 appropriate patient assignments. The public app provides actual login, not a demo
 role selector. Disable/rotate test access after the event.
 
+The automated hosted tests create temporary sessions for these existing accounts;
+they do not test their passwords. Before recording, sign in normally as each role
+using the team-held passwords and record success without writing passwords here.
+
 ## Five-minute recording
+
+An automated narrated walkthrough has been generated at
+`test-results/recording/Aarogya-Drishti-5-minute-walkthrough.webm` and is included in
+the security-update package. It uses actual synthetic test screenshots and clearly
+discloses generated narration. The team should review it, add accurate contributor
+details and complete physical-device evidence before submission.
 
 1. 0:00–0:30: show the deployed HTTPS URL, Telugu switch and synthetic-only purpose.
 2. 0:30–1:20: worker registers a synthetic resident of G. Madugula, consent/checklist,
@@ -58,6 +71,30 @@ provider tests were run.
 Desktop browser tests with fake cameras and a mobile viewport cannot certify real
 Android installation, camera permissions, microphone quality or mobile-network behavior.
 
+### Team acceptance record
+
+Status as of the automated handoff: **not executed by the team in this record**.
+Fill in the result and evidence path after performing each check. A blank field is
+not a pass. Use synthetic participants and records throughout.
+
+Date/time (IST): ______; tester: ______; phone/Android/Chrome versions: ______;
+laptop/browser version: ______; network used on each device: ______.
+
+| Check                                                          | Result (pass/fail) | Evidence or issue |
+| -------------------------------------------------------------- | ------------------ | ----------------- |
+| Normal password sign-in for all five roles                     |                    |                   |
+| Android install/reopen, English/Telugu layout                  |                    |                   |
+| Physical camera capture and retake guidance                    |                    |                   |
+| Airplane-mode registration survives restart                    |                    |                   |
+| Reconnect twice creates exactly one server record              |                    |                   |
+| Phone/laptop video and audible speech in both directions       |                    |                   |
+| Mute, camera-off and leave on both devices                     |                    |                   |
+| Consent withdrawal rejects new joins; reschedule/expiry checks |                    |                   |
+| Case closure and aggregate counts                              |                    |                   |
+
+Backup/restore rehearsal, privileged MFA and immediate provider-side revocation
+have separate gaps documented in [SECURITY_AND_RECOVERY.md](SECURITY_AND_RECOVERY.md).
+
 ## Package checklist
 
 - Repository with lockfile, migrations, seed and ignored-secret templates.
@@ -68,6 +105,16 @@ Android installation, camera permissions, microphone quality or mobile-network b
 - Team-owned five-minute video and completed real-device/restore evidence.
 
 ## Contribution and assistance disclosure (team to complete)
+
+Verified assistance disclosure: Codex/ChatGPT generated and revised source,
+documentation, automated tests and this walkthrough. The video uses Windows'
+installed Microsoft Zira speech voice and synthetic application test screenshots.
+No student's voice, name, contribution or human review is implied. Team members
+must add the work they actually performed and can explain.
+
+| Student                     | Center | Actual role/contribution | Reviewed files/commits | Evidence |
+| --------------------------- | ------ | ------------------------ | ---------------------- | -------- |
+| To be completed by the team |        |                          |                        |          |
 
 Record each student's name, center, role, implementation/review/testing work and
 the commits or files they can explain. Do not invent contributors or claim human

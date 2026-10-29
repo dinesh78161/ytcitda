@@ -1,0 +1,2 @@
+image_path,patient_id,label,label_basis,source,license
+images/example-original.jpg,anonymous-subject-001,benign_lesion,clinician_review,dataset-record-DOI,verified-license

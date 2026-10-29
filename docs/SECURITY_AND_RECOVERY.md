@@ -5,16 +5,21 @@ or processing real patient information requires a separate approved system.
 
 ## Trust boundaries and controls
 
-| Threat                             | Current control                                                                              | Limit / remaining verification                                                                   |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Wrong-record access or forged role | Supabase RLS and workflow RPCs check active identity/assignment; Node verifies user token    | Five hosted roles checked; staff administration remains trusted Supabase work                    |
-| Stolen device/token                | Expiring Auth tokens and protected cloud reads; queue scoped to actor                        | IndexedDB is not encrypted by this app; privileged MFA enforcement remains pending               |
-| Leaked service credential          | Ignored environment files, server-only secrets, static path guards                           | Rotate any key previously disclosed; keep backups out of Git                                     |
-| Malicious files                    | Decode/re-encode JPEG; PDF page/structure checks; size/dimension limits                      | No antivirus engine; no guarantee of complete malware detection                                  |
-| Lost upload response/double submit | Registration ledger and stable upload IDs; object/checksum reconciliation on retry           | Periodic orphan-object cleanup is an operational task                                            |
-| Shared/expired video link          | Appointment-specific user token, consent/role checks and join window                         | LiveKit already-admitted modified clients require provider-side removal for immediate revocation |
-| AI outage or false result          | Labelled mock; optional strict pinned research contract; independent signed clinician review | Quality thresholds are prototypes; no model accuracy is claimed                                  |
-| Backup or log leak                 | Minimal audit metadata, no clinical content in server errors/logs                            | Database dumps and object exports still require encrypted storage/access controls                |
+The [security update](SECURITY_UPDATE.md) adds the authenticator UI/API guard,
+migration 006 and encrypted backup tools. Local tests and real hosted Auth checks
+pass; hosted database enforcement awaits owner rollout. A local isolated PostgreSQL
+restore has been executed; the hosted project restore remains untested.
+
+| Threat                             | Current control                                                                              | Limit / remaining verification                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Wrong-record access or forged role | Supabase RLS and workflow RPCs check active identity/assignment; Node verifies user token    | Five hosted roles checked; staff administration remains trusted Supabase work                                  |
+| Stolen device/token                | Expiring Auth tokens and protected cloud reads; queue scoped to actor                        | IndexedDB is not encrypted by this app; MFA source/tests complete; hosted policy rollout requires owner access |
+| Leaked service credential          | Ignored environment files, server-only secrets, static path guards                           | Rotate any key previously disclosed; keep backups out of Git                                                   |
+| Malicious files                    | Decode/re-encode JPEG; PDF page/structure checks; size/dimension limits                      | No antivirus engine; no guarantee of complete malware detection                                                |
+| Lost upload response/double submit | Registration ledger and stable upload IDs; object/checksum reconciliation on retry           | Periodic orphan-object cleanup is an operational task                                                          |
+| Shared/expired video link          | Appointment-specific user token, consent/role checks and join window                         | LiveKit already-admitted modified clients require provider-side removal for immediate revocation               |
+| AI outage or false result          | Labelled mock; optional strict pinned research contract; independent signed clinician review | Quality thresholds are prototypes; no model accuracy is claimed                                                |
+| Backup or log leak                 | Minimal audit metadata, no clinical content in server errors/logs                            | Database dumps and object exports still require encrypted storage/access controls                              |
 
 The current UI exposes only aggregate CSV export and no identifiable bulk export.
 Private file downloads are audited before signed access is issued. Signed clinical
@@ -30,7 +35,7 @@ records, consent history and audit history cannot be rewritten by browser roles.
    good commit. Confirm whether auto-deploy was disabled by selecting a specific commit.
    Deployments do not run database migrations or seed resets automatically.
 
-## Backup and isolated restore rehearsal (pending execution)
+## Hosted backup and isolated restore rehearsal (pending owner access)
 
 Do not test restore against the existing project. Before the event:
 
@@ -49,8 +54,11 @@ Do not test restore against the existing project. Before the event:
    command output with secrets removed and record the restore time.
 6. Only after this succeeds may the team claim a tested backup/restore route.
 
-No restore was performed in this development session; direct DB backup credentials
-and an isolated destination were not supplied. Supabase managed backup availability
+An encrypted isolated PGlite restore was executed with all 20 application tables,
+retry ledger, access policies and a synthetic external blob. Its exact scope and
+evidence are in [SECURITY_UPDATE.md](SECURITY_UPDATE.md). No hosted-project restore
+was performed; direct DB backup access and an isolated destination were not supplied.
+Supabase managed backup availability
 depends on the actual plan and should be checked in its dashboard.
 
 ## Fallback if hosting is unavailable

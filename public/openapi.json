@@ -3,7 +3,7 @@
   "info": {
     "title": "Aarogya Drishti integration API",
     "version": "0.1.0",
-    "description": "Synthetic demonstration only. Database workflows use authenticated Supabase RPCs documented in docs/API_CONTRACT.md. Status flags report configuration presence, not provider connectivity."
+    "description": "Screening-to-care integration API. Clinical mode supports clinician-led workflows with automated image analysis disabled. Evaluation mode supports research analysis of test records. Database workflows use authenticated Supabase RPCs documented in docs/API_CONTRACT.md. Status flags report configuration presence, not provider connectivity. Clinician and administrator roles require aal2; database enforcement is supplied in migration 006."
   },
   "servers": [
     {
@@ -44,7 +44,10 @@
                       "type": "boolean"
                     },
                     "ai_provider": {
-                      "enum": ["mock", "research", "gemini", "disabled"]
+                      "enum": ["mock", "research", "gemini", "medgemma", "disabled"]
+                    },
+                    "workspace_mode": {
+                      "enum": ["evaluation", "clinical"]
                     },
                     "reminders": {
                       "type": "boolean"
@@ -150,7 +153,7 @@
     "/api/analyze": {
       "post": {
         "summary": "Store a mock result, research classification, or Gemini image observations",
-        "description": "Requires an assigned acceptable-quality image and current photo consent. Gemini requires migration 008 and returns structured observations with no numeric confidence. Assignment and consent are rechecked before saving. No analysis can make a clinical decision. Unavailable services never fall back to mock.",
+        "description": "Evaluation only: requires a test patient, an assigned acceptable-quality image and current photo consent. Clinical workspace analysis is disabled. Gemini requires migration 008 and returns structured observations with no numeric confidence. Assignment and consent are rechecked before saving. No analysis can make a clinical decision. Unavailable services never fall back to mock.",
         "requestBody": {
           "required": true,
           "content": {
@@ -162,6 +165,12 @@
                   "image_id": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": ["en", "te", "hi", "ta", "kn", "ml", "mr", "bn", "or"],
+                    "default": "en",
+                    "description": "Language for new Gemini report prose. Existing reports retain their original language."
                   }
                 }
               }

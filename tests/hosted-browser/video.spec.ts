@@ -24,7 +24,7 @@ test("two assigned users exchange live video through the configured LiveKit proj
     name = `Synthetic Video ${patient.slice(0, 8)}`;
   let appointmentId: string | undefined,
     registered = false,
-    mediaVerified = false;
+    consultationVerified = false;
   const rpc = async (
     role: string,
     action: string,
@@ -106,6 +106,14 @@ test("two assigned users exchange live video through the configured LiveKit proj
       browsers.push(instance);
       const context = await instance.newContext({
         permissions: ["camera", "microphone"],
+        ...(process.env.RECORD_HOSTED_VIDEO_DIR
+          ? {
+              recordVideo: {
+                dir: process.env.RECORD_HOSTED_VIDEO_DIR,
+                size: { width: 1280, height: 720 },
+              },
+            }
+          : {}),
       });
       contexts.push(context);
       await context.addInitScript(() => {
@@ -161,12 +169,15 @@ test("two assigned users exchange live video through the configured LiveKit proj
         .locator(".appointment-card")
         .filter({ has: page.getByRole("heading", { name, exact: true }) });
       await expect(card).toHaveCount(1);
+      const joiningAt = Date.now();
       await card
         .getByRole("button", { name: "Join consultation", exact: true })
         .click();
+      // Public WebRTC negotiation can exceed Playwright's default five seconds.
       await expect(
         page.locator(".live-consultation").getByRole("status"),
-      ).toContainText(/^Connected/);
+      ).toContainText(/^Connected/, { timeout: 30000 });
+      console.log(`LiveKit ${role} connected in ${Date.now() - joiningAt} ms.`);
       await expect(
         page.getByRole("button", { name: "Turn camera off", exact: true }),
       ).toBeVisible({ timeout: 30000 });
@@ -212,36 +223,49 @@ test("two assigned users exchange live video through the configured LiveKit proj
           expect.objectContaining({ playing: true }),
         ]);
       await expect(page.locator(".consultation-tile audio")).toHaveCount(1);
+      // Give viewers time to see the received streams in requested recordings.
+      if (process.env.RECORD_HOSTED_VIDEO_DIR) await page.waitForTimeout(3000);
       await page.getByRole("dialog").screenshot({
         path: `test-results/livekit-two-party-${i + 1}.png`,
       });
     }
-    mediaVerified = true;
     await pages[0]
       .getByRole("button", { name: "Mute microphone", exact: true })
       .click();
     await expect(
       pages[0].getByRole("button", { name: "Enable microphone", exact: true }),
     ).toBeVisible();
+    if (process.env.RECORD_HOSTED_VIDEO_DIR)
+      await pages[0].waitForTimeout(1200);
     await pages[0]
       .getByRole("button", { name: "Turn camera off", exact: true })
       .click();
     await expect(
       pages[0].getByRole("button", { name: "Turn camera on", exact: true }),
     ).toBeVisible();
+    if (process.env.RECORD_HOSTED_VIDEO_DIR)
+      await pages[0].waitForTimeout(1200);
     for (const page of pages) {
       await page
         .getByRole("button", { name: "Leave consultation", exact: true })
         .click();
       await expect(page.locator(".live-consultation")).toHaveCount(0);
     }
+    consultationVerified = true;
   } finally {
-    for (const context of contexts) await context.close();
+    for (const [index, context] of contexts.entries()) {
+      const recorded = context.pages()[0]?.video();
+      await context.close();
+      if (recorded && process.env.RECORD_HOSTED_VIDEO_DIR)
+        await recorded.saveAs(
+          `${process.env.RECORD_HOSTED_VIDEO_DIR}/livekit-${index === 0 ? "worker" : "specialist"}.webm`,
+        );
+    }
     for (const instance of browsers) await instance.close();
     if (appointmentId) {
       await rpc("navigator", "attendance", {
         appointment_id: appointmentId,
-        status: mediaVerified ? "completed" : "cancelled",
+        status: consultationVerified ? "completed" : "cancelled",
       });
       const tasks = checked(
         await accounts.navigator.client

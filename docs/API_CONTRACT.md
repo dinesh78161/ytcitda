@@ -5,6 +5,10 @@ available at `/openapi.json` after deployment. Use the same HTTPS origin as the 
 All POSTs require `Content-Type: application/json` and
 `Authorization: Bearer <current Supabase user access token>`. Active staff, role,
 patient assignment and current consent are checked independently on the server.
+The updated API additionally requires `aal2` for Medical Officer, specialist and
+district-admin tokens. The token is decoded only after Supabase verifies it.
+Migration 006 enforces the corresponding rule on table reads and SECURITY DEFINER
+workflow/summary RPCs; see [rollout status](SECURITY_UPDATE.md).
 
 `GET /api/status` is public and reports configuration only. A true flag does not
 prove that a provider, account, bucket or database is healthy. Hosted acceptance
