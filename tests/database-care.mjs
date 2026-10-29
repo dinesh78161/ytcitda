@@ -2,6 +2,38 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 export function registerCareTests({ db, asRole, rpc, uid, patient, denied }) {
   const referral = "60000000-0000-4000-8000-000000000001";
+  test("new treatment accepts a null optional UUID from the browser form", async () => {
+    await assert.rejects(
+      () =>
+        asRole("authenticated", uid(2), () =>
+          rpc("treatment", {
+            referral_id: referral,
+            treatment_id: "",
+            plan: "Synthetic form regression",
+            notes: "Empty form UUID must not be submitted",
+            status: "active",
+            next_review_at: null,
+          }),
+        ),
+      (error) => error.code === "22P02",
+    );
+    await asRole("authenticated", uid(2), async () => {
+      const result = await rpc("treatment", {
+        referral_id: referral,
+        treatment_id: null,
+        plan: "Synthetic form regression",
+        notes: "New form record has no treatment UUID yet",
+        status: "active",
+        next_review_at: null,
+      });
+      const id = result.rows[0].result.id;
+      assert.match(id, /^[0-9a-f-]{36}$/);
+      const saved = (
+        await db.query("select status from public.treatments where id=$1", [id])
+      ).rows[0];
+      assert.equal(saved.status, "active");
+    });
+  });
   test("treatment RPC is idempotent, append-only and revision checked", async () => {
     await asRole("authenticated", uid(2), async () => {
       const payload = {

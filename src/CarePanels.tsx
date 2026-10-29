@@ -279,7 +279,7 @@ export function PatientCare({ patient }: { patient: Patient }) {
                 await run(() =>
                   w.execute(treatmentId ? "treatment_update" : "treatment", {
                     referral_id: referral,
-                    treatment_id: treatmentId,
+                    treatment_id: treatmentId || null,
                     revision: selectedTreatment?.revision,
                     plan,
                     notes,
