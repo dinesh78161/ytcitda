@@ -23,8 +23,8 @@ async function fixture(
   } = {},
 ) {
   let data = createDemo();
-  const patient = data.patients[0],
-    profile = demoProfiles[1];
+  const patient = data.patients[0];
+  let profile = demoProfiles[1];
   if (options.closed) data.screenings[0].status = "closed";
   if (options.consent === false) data.consents[0].granted = false;
   const html = await (await page.request.get(baseURL)).text();
@@ -79,6 +79,7 @@ async function fixture(
       },
     },
   );
+  let profileReads = 0;
   await page.route(`https://${reference}.supabase.co/**`, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     const respond = (body: unknown, status = 200) =>
@@ -87,8 +88,13 @@ async function fixture(
         contentType: "application/json",
         body: JSON.stringify(body),
       });
-    if (pathname === "/auth/v1/user") return respond(user);
-    if (pathname === "/rest/v1/profiles") return respond(profile);
+    if (pathname === "/auth/v1/user")
+      return respond({ ...user, id: profile.id });
+    if (pathname === "/auth/v1/logout") return respond({});
+    if (pathname === "/rest/v1/profiles") {
+      profileReads++;
+      return respond(profile);
+    }
     if (pathname === "/rest/v1/rpc/submit_workflow") {
       const body = route.request().postDataJSON();
       data = applyDemoCommand(data, profile, {
@@ -172,6 +178,46 @@ async function fixture(
     },
     finishUpload,
     checks: () => checks,
+    profileReads: () => profileReads,
+    otherTabAuth: async (
+      event: "SIGNED_IN" | "SIGNED_OUT",
+      account = profile,
+    ) => {
+      profile = account;
+      const payload = JSON.parse(
+        Buffer.from(token.split(".")[1], "base64url").toString(),
+      );
+      payload.sub = account.id;
+      const updatedToken = [
+        token.split(".")[0],
+        Buffer.from(JSON.stringify(payload)).toString("base64url"),
+        token.split(".")[2],
+      ].join(".");
+      await page.evaluate(
+        ({ key, event, session }) => {
+          if (event === "SIGNED_OUT") localStorage.removeItem(key);
+          else localStorage.setItem(key, JSON.stringify(session));
+          const channel = new BroadcastChannel(key);
+          channel.postMessage({
+            event,
+            session: event === "SIGNED_OUT" ? null : session,
+          });
+          channel.close();
+        },
+        {
+          key: `sb-${reference}-auth-token`,
+          event,
+          session: {
+            access_token: updatedToken,
+            refresh_token: "synthetic-refresh",
+            token_type: "bearer",
+            expires_in: 3600,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user: { ...user, id: account.id },
+          },
+        },
+      );
+    },
   };
 }
 
@@ -312,4 +358,125 @@ test("closed cases explain why report uploads are disabled", async ({
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test("returning to a browser tab preserves the patient care form and unsaved notes", async ({
+  page,
+  baseURL,
+}) => {
+  const state = await fixture(page, baseURL!, { automatic: true });
+  const notes = page.getByRole("textbox", {
+    name: "Investigation notes / result",
+    exact: true,
+  });
+  const plan = page.getByRole("textbox", {
+    name: "Treatment plan",
+    exact: true,
+  });
+  await notes.fill(
+    "Synthetic unsaved investigation notes retained when returning to the browser.",
+  );
+  await plan.fill("Synthetic unsaved treatment plan retained on tab return.");
+  await page
+    .getByRole("combobox", { name: "Investigation stage", exact: true })
+    .selectOption("collected");
+  await notes.scrollIntoViewIfNeeded();
+  const originalReads = state.profileReads();
+  await notes.evaluate((el) =>
+    el.setAttribute("data-tab-stability", "original-form"),
+  );
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await page.evaluate(async () => {
+      // Drive the browser visibility events used by the real Supabase SDK.
+      // Headless browsers keep pages visible even when another page is focused.
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "hidden",
+      });
+      window.dispatchEvent(new Event("visibilitychange"));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      });
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+    // Wait for the SDK's storage lock and deferred auth callback to settle.
+    await page.waitForTimeout(500);
+    await expect(
+      page.getByRole("tab", { name: "Care plan", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(notes).toHaveValue(
+      "Synthetic unsaved investigation notes retained when returning to the browser.",
+    );
+    await expect(plan).toHaveValue(
+      "Synthetic unsaved treatment plan retained on tab return.",
+    );
+    await expect(notes).toHaveAttribute("data-tab-stability", "original-form");
+    await expect(
+      page.getByRole("combobox", { name: "Investigation stage", exact: true }),
+    ).toHaveValue("collected");
+    expect(state.profileReads()).toBe(originalReads);
+  }
+  await page.screenshot({
+    path: test.info().outputPath("care-form-after-tab-returns.png"),
+  });
+});
+
+test("a genuine account change still resets the patient workspace", async ({
+  page,
+  baseURL,
+}) => {
+  const state = await fixture(page, baseURL!, { automatic: true });
+  await page
+    .getByRole("textbox", { name: "Investigation notes / result", exact: true })
+    .fill("Synthetic unsaved notes for previous account only.");
+  await state.otherTabAuth("SIGNED_IN", demoProfiles[2]);
+  await expect(page.locator(".user-copy strong")).toHaveText("Specialist");
+  await expect(
+    page.getByRole("tab", { name: "Care plan", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Patient registry", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: /Search by name, village or ID/ })
+    .fill("Demo Resident 01");
+  await page
+    .getByRole("button", { name: "Open record: Demo Resident 01", exact: true })
+    .click();
+  await page.getByRole("tab", { name: "Care plan", exact: true }).click();
+  await expect(
+    page.getByRole("textbox", {
+      name: "Investigation notes / result",
+      exact: true,
+    }),
+  ).toHaveValue("");
+});
+
+test("signing out in another tab still clears the patient workspace", async ({
+  page,
+  baseURL,
+}) => {
+  const state = await fixture(page, baseURL!, { automatic: true });
+  await page
+    .getByRole("textbox", { name: "Investigation notes / result", exact: true })
+    .fill("Synthetic notes must disappear on sign out.");
+  await state.otherTabAuth("SIGNED_OUT");
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", {
+      name: "Investigation notes / result",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await state.otherTabAuth("SIGNED_IN");
+  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "Care plan", exact: true }),
+  ).toHaveCount(0);
 });

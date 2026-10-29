@@ -120,7 +120,9 @@ export function useWorkspace() {
   );
   useEffect(() => {
     let alive = true;
+    let sessionUserId: string | undefined;
     const enter = async (id?: string) => {
+      sessionUserId = id;
       setLoading(true);
       try {
         if (configurationError) throw new Error(configurationError);
@@ -138,7 +140,10 @@ export function useWorkspace() {
         setProfile(actor);
         await refresh(actor);
       } catch (e) {
-        if (alive) setError(message(e));
+        if (alive) {
+          sessionUserId = undefined;
+          setError(message(e));
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -154,7 +159,11 @@ export function useWorkspace() {
     const subscription = supabase?.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT")
         setTimeout(() => {
-          if (alive) void enter(session?.user.id);
+          if (!alive) return;
+          // Supabase repeats SIGNED_IN on tab focus for an existing session.
+          // Keep the mounted patient form when the account has not changed.
+          if (event === "SIGNED_IN" && session?.user.id === sessionUserId) return;
+          void enter(session?.user.id);
         }, 0);
     });
     const on = () => setOnline(true),
