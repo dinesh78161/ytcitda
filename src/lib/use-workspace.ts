@@ -41,11 +41,53 @@ export function useWorkspace() {
     ai: false,
     reminders: false,
   });
-  useEffect(() => {
-    void serviceStatus()
-      .then(setServices)
-      .catch(() => {});
+  const [checkingServices, setCheckingServices] = useState(true);
+  const [servicesError, setServicesError] = useState("");
+  const servicesGeneration = useRef(0);
+  const refreshServices = useCallback(async () => {
+    const request = ++servicesGeneration.current;
+    setCheckingServices(true);
+    try {
+      const next = await serviceStatus();
+      if (request === servicesGeneration.current) {
+        setServices(next);
+        setServicesError("");
+      }
+      return next;
+    } catch (cause) {
+      if (request === servicesGeneration.current)
+        setServicesError("Could not check the file connection. Please retry.");
+      throw cause;
+    } finally {
+      if (request === servicesGeneration.current) setCheckingServices(false);
+    }
   }, []);
+  useEffect(() => {
+    let stopped = false,
+      attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = async () => {
+      try {
+        await refreshServices();
+      } catch {
+        if (!stopped && attempts++ < 3)
+          timer = setTimeout(() => void check(), 3000 * attempts);
+      }
+    };
+    const reconnect = () => {
+      clearTimeout(timer);
+      attempts = 0;
+      void check();
+    };
+    void check();
+    window.addEventListener("online", reconnect);
+    return () => {
+      stopped = true;
+      ++servicesGeneration.current;
+      clearTimeout(timer);
+      window.removeEventListener("online", reconnect);
+    };
+  }, [refreshServices]);
   const [profile, setProfile] = useState<Profile | null>(null),
     [data, setData] = useState(emptyData),
     [summary, setSummary] = useState<Summary>(() => summarize(emptyData()));
@@ -236,7 +278,9 @@ export function useWorkspace() {
   }, [online, profile?.id]); // Retry only on reconnect/session change.
   return {
     services,
-    refreshServices: async () => setServices(await serviceStatus()),
+    refreshServices,
+    checkingServices,
+    servicesError,
     profile,
     data,
     summary,

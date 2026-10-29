@@ -429,6 +429,72 @@ export function PatientCare({ patient }: { patient: Patient }) {
             )}
           </p>
         )}
+        {closed ? (
+          <p className="form-notice" role="status">
+            {l(
+              "Reopen this case before attaching a report.",
+              "నివేదిక జోడించే ముందు ఈ కేసును మళ్లీ తెరవండి.",
+            )}
+          </p>
+        ) : !w.online ? (
+          <p className="form-notice" role="status">
+            {l(
+              "Reconnect to the internet before attaching a report.",
+              "నివేదిక జోడించే ముందు ఇంటర్నెట్‌కు మళ్లీ కనెక్ట్ అవ్వండి.",
+            )}
+          </p>
+        ) : fileBusy ? (
+          <p className="form-notice" role="status">
+            {l(
+              "Uploading report. Please keep this page open.",
+              "నివేదిక అప్‌లోడ్ అవుతోంది. ఈ పేజీని తెరిచి ఉంచండి.",
+            )}
+          </p>
+        ) : w.busy ? (
+          <p className="form-notice" role="status">
+            {l(
+              "Wait for the current save to finish before attaching a report.",
+              "నివేదిక జోడించే ముందు ప్రస్తుత సేవ్ పూర్తయ్యే వరకు వేచి ఉండండి.",
+            )}
+          </p>
+        ) : null}
+        {isCloud &&
+          !w.services.files &&
+          !closed &&
+          reportConsent &&
+          w.online && (
+            <div className="form-notice" role="status">
+              <div>
+                <p>
+                  {w.checkingServices
+                    ? l(
+                        "Checking the file connection. Uploads will become available when it is confirmed.",
+                        "ఫైల్ కనెక్షన్‌ను తనిఖీ చేస్తున్నాము. నిర్ధారణ తర్వాత అప్‌లోడ్ చేయవచ్చు.",
+                      )
+                    : w.servicesError
+                      ? l(
+                          "The file connection could not be checked. Retry to enable report uploads.",
+                          "ఫైల్ కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము. నివేదికలను అప్‌లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి.",
+                        )
+                      : l(
+                          "Private file storage is not configured. Contact the project administrator.",
+                          "ప్రైవేట్ ఫైల్ నిల్వ కాన్ఫిగర్ కాలేదు. ప్రాజెక్ట్ నిర్వాహకుడిని సంప్రదించండి.",
+                        )}
+                </p>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={w.checkingServices}
+                  onClick={() => void run(w.refreshServices)}
+                >
+                  {l(
+                    "Retry file connection",
+                    "ఫైల్ కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి",
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         <Field
           label={l("Attach diagnostic report", "పరీక్ష నివేదిక జోడించండి")}
         >
@@ -438,6 +504,7 @@ export function PatientCare({ patient }: { patient: Patient }) {
             disabled={
               fileBusy ||
               closed ||
+              !w.online ||
               w.busy ||
               !reportConsent ||
               (isCloud && !w.services.files)
