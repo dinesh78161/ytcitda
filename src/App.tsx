@@ -223,16 +223,6 @@ export default function App() {
               ))}
             </nav>
             <div className="sidebar-bottom">
-              <div className="programme-card">
-                <span className="small-sun">✳</span>
-                <span>
-                  AAROHAN <b>2026</b>
-                </span>
-                <p>{t("tagline")}</p>
-                <span className="programme-location">
-                  <MapPin size={13} /> ITDA Paderu · ASR District
-                </span>
-              </div>
               <button
                 className={`nav-item ${page === "settings" ? "active" : ""}`}
                 onClick={() => navigate("settings")}
