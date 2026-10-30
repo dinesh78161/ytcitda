@@ -9,6 +9,7 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: [
         "aarogya-logo-transparent.png",
+        "aarogya-logo-light.png",
         "favicon-transparent-32.png",
         "apple-touch-icon-transparent.png",
         "app-icon-transparent-192.png",

@@ -183,6 +183,13 @@ select {
 .sidebar .brand {
   justify-content: center;
 }
+.brand-logo-light {
+  mask-image: url("/aarogya-logo-transparent.png");
+  mask-mode: alpha;
+  mask-size: 100% 100%;
+  mask-position: center;
+  mask-repeat: no-repeat;
+}
 .sidebar-rule {
   height: 1px;
   background: #ffffff13;
