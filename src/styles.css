@@ -1764,6 +1764,20 @@ tbody tr:hover {
   width: 100%;
   margin-top: 5px;
 }
+.greeting-preference {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 16px 0;
+  color: var(--muted, #62756d);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.greeting-preference input,
+.greeting-preference svg {
+  flex-shrink: 0;
+}
 .login-form > .small {
   margin-top: 26px;
   font-size: 9px;

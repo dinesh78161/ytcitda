@@ -2,6 +2,8 @@ import LanguageSelector from "./LanguageSelector";
 import { initialLanguage } from "./lib/languages";
 import { localize } from "./lib/localize";
 import { localeForLanguage, languageName } from "./lib/languages";
+import { greetings } from "./lib/greetings";
+import { useLoginGreeting } from "./lib/use-login-greeting";
 import {
   createContext,
   useContext,
@@ -45,6 +47,7 @@ import {
   UploadCloud,
   UsersRound,
   Video,
+  Volume2,
   Wifi,
   X,
 } from "lucide-react";
@@ -115,6 +118,10 @@ export default function App() {
     [lang, setLang] = useState<Language>(() =>
       initialLanguage(localStorage.getItem("aarogya-language")),
     );
+  const greeting = useLoginGreeting(
+    lang,
+    !!w.profile && !w.loading && !w.mfaRequired,
+  );
   const [page, setPage] = useState<Page>("overview"),
     [search, setSearch] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
@@ -167,7 +174,7 @@ export default function App() {
   return (
     <Context.Provider value={{ w, lang, t, notify, run }}>
       {!w.profile ? (
-        <Login lang={lang} setLang={setLang} />
+        <Login lang={lang} setLang={setLang} greeting={greeting} />
       ) : w.mfaRequired ? (
         <MfaGate lang={lang} onVerified={w.completeMfa} onSignOut={w.signOut} />
       ) : (
@@ -273,6 +280,15 @@ export default function App() {
                   <span>{w.online ? t("online") : t("offline")}</span>
                 </span>
                 <LanguageSelector language={lang} onChange={setLang} />
+                <button
+                  className="icon-button"
+                  aria-label={greetings[lang].playLabel}
+                  title={`${greetings[lang].playLabel}: ${greetings[lang].text}`}
+                  onClick={greeting.play}
+                  disabled={w.loading}
+                >
+                  <Volume2 size={18} />
+                </button>
                 <div className="header-divider" />
                 <button
                   className="user-button"
@@ -2259,9 +2275,11 @@ function WorkspaceSettings() {
 function Login({
   lang,
   setLang,
+  greeting,
 }: {
   lang: Language;
   setLang: (lang: Language) => void;
+  greeting: ReturnType<typeof useLoginGreeting>;
 }) {
   const { w, t } = useApp(),
     [email, setEmail] = useState(""),
@@ -2275,12 +2293,14 @@ function Login({
     try {
       if (!supabase)
         throw new Error(configurationError ?? "Workspace is loading.");
+      greeting.begin();
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
     } catch (e) {
+      greeting.cancel();
       setError(message(e));
     } finally {
       setBusy(false);
@@ -2338,6 +2358,17 @@ function Login({
                   {localize(lang, error || w.error || "")}
                 </div>
               )}
+              <label className="greeting-preference">
+                <input
+                  type="checkbox"
+                  checked={greeting.enabled}
+                  onChange={(event) =>
+                    greeting.setEnabled(event.target.checked)
+                  }
+                />
+                <Volume2 size={17} aria-hidden="true" />
+                <span>{greetings[lang].soundLabel}</span>
+              </label>
               <button
                 className="button primary"
                 disabled={busy || !!configurationError}
