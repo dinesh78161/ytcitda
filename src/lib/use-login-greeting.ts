@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { greetingAudioPath } from "./greetings";
 import type { Language } from "./languages";
 
@@ -90,17 +90,11 @@ function createGreetingPlayer() {
 }
 
 export function useLoginGreeting(language: Language, ready: boolean) {
-  const [enabled, setEnabled] = useState(
-    () => localStorage.getItem("aarogya-login-greeting") !== "off",
-  );
   const player = useRef<ReturnType<typeof createGreetingPlayer> | null>(null);
   if (!player.current) player.current = createGreetingPlayer();
   const audio = player.current;
   const pending = useRef(false);
 
-  useEffect(() => {
-    localStorage.setItem("aarogya-login-greeting", enabled ? "on" : "off");
-  }, [enabled]);
   useEffect(() => {
     if (ready && pending.current) {
       pending.current = false;
@@ -110,9 +104,9 @@ export function useLoginGreeting(language: Language, ready: boolean) {
   useEffect(() => () => audio.dispose(), [audio]);
 
   const begin = useCallback(() => {
-    pending.current = enabled;
-    if (enabled) audio.prepare(language);
-  }, [audio, enabled, language]);
+    pending.current = true;
+    audio.prepare(language);
+  }, [audio, language]);
   const cancel = useCallback(() => {
     pending.current = false;
     audio.stop();
@@ -121,5 +115,5 @@ export function useLoginGreeting(language: Language, ready: boolean) {
     audio.prepare(language);
     void audio.play(language);
   };
-  return { enabled, setEnabled, begin, cancel, play };
+  return { begin, cancel, play };
 }

@@ -231,22 +231,24 @@ test("failed sign-in stays silent; successful retry greets only once and reload 
   expect((await audioState(page)).started).toBe(0);
 });
 
-test("muting the greeting persists and does not block sign-in or manual playback", async ({
+test("greeting is automatic without a checkbox, including when the old setting was off", async ({
   page,
 }) => {
   await fixture(page, "en");
-  await page.getByRole("checkbox", { name: greetings.en.soundLabel }).uncheck();
+  await page.evaluate(() =>
+    localStorage.setItem("aarogya-login-greeting", "off"),
+  );
   await page.reload();
-  await expect(
-    page.getByRole("checkbox", { name: greetings.en.soundLabel }),
-  ).not.toBeChecked();
+  await expect(page.locator('.login-form input[type="checkbox"]')).toHaveCount(
+    0,
+  );
   await signIn(page);
   await expect(page.getByRole("navigation")).toBeVisible();
-  expect((await audioState(page)).started).toBe(0);
+  await expect.poll(async () => (await audioState(page)).started).toBe(1);
   await page
     .getByRole("button", { name: greetings.en.playLabel, exact: true })
     .click();
-  await expect.poll(async () => (await audioState(page)).started).toBe(1);
+  await expect.poll(async () => (await audioState(page)).started).toBe(2);
 });
 
 test("greeting waits for MFA before playing", async ({ page }) => {

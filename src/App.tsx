@@ -2358,17 +2358,6 @@ function Login({
                   {localize(lang, error || w.error || "")}
                 </div>
               )}
-              <label className="greeting-preference">
-                <input
-                  type="checkbox"
-                  checked={greeting.enabled}
-                  onChange={(event) =>
-                    greeting.setEnabled(event.target.checked)
-                  }
-                />
-                <Volume2 size={17} aria-hidden="true" />
-                <span>{greetings[lang].soundLabel}</span>
-              </label>
               <button
                 className="button primary"
                 disabled={busy || !!configurationError}

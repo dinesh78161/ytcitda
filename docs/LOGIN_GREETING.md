@@ -6,10 +6,10 @@ hear it only after MFA and workspace loading finish. Restoring a session,
 refreshing a page, renewing a token, navigating or changing languages does not
 automatically repeat it. A failed login does not play it.
 
-The login form's greeting checkbox defaults on and stores its preference in
-`aarogya-login-greeting`. The speaker button beside the header language selector
-replays the greeting in the current display language, including when automatic
-greetings are off. It also supplies a user gesture when a browser blocks automatic
+The greeting plays automatically after sign-in; there is no checkbox on the login
+form. Any previous `aarogya-login-greeting` preference is ignored. The speaker
+button beside the header language selector replays the greeting in the current
+display language. It also supplies a user gesture when a browser blocks automatic
 playback. Audio failures do not block login. Speaker volume/mute remains under
 the device's control; phone/Safari playback needs physical-device acceptance.
 
@@ -42,7 +42,7 @@ greeting. The new service worker precaches the updated audio for offline playbac
 The local browser checks in `tests/security-browser/greeting.spec.ts` intercept
 Auth, database and service status requests. They decode and play the real bundled
 clips in Edge, check each selected language's path and playback completion, and
-cover MFA gating, unsuccessful login, opt-out persistence, reload/session silence
+cover MFA gating, unsuccessful login, automatic playback despite a legacy opt-out, reload/session silence
 and blocked audio. No hosted records are created or changed. Run them against a
 built Supabase frontend with:
 
