@@ -158,6 +158,7 @@ select {
   display: flex;
   flex-direction: column;
   z-index: 40;
+  overflow-y: auto;
 }
 .brand {
   display: flex;
@@ -170,16 +171,17 @@ select {
     650 22px/1.15 "Manrope Variable",
     sans-serif;
   letter-spacing: -0.7px;
+  flex-shrink: 0;
 }
 .brand img {
-  height: 49px;
-  width: 49px;
+  height: 144px;
+  width: 144px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 12px;
 }
-.brand-second {
-  display: block;
-}
-.brand-dot {
-  color: #efc784;
+.sidebar .brand {
+  justify-content: center;
 }
 .sidebar-rule {
   height: 1px;
@@ -1684,6 +1686,11 @@ tbody tr:hover {
 .mfa-card p {
   margin: 0;
 }
+.mfa-logo {
+  display: block;
+  object-fit: contain;
+  border-radius: 10px;
+}
 .mfa-card form,
 .mfa-enrollment {
   display: grid;
@@ -1721,7 +1728,11 @@ tbody tr:hover {
 .login-brand h1 {
   font-size: 44px;
   max-width: 430px;
-  margin-top: 110px;
+  margin-top: 48px;
+}
+.login-brand .brand img {
+  width: 180px;
+  height: 180px;
 }
 .login-brand > p {
   font-size: 15px;
@@ -1838,8 +1849,8 @@ html[lang="te"] .journey-steps > span {
     font-size: 20px;
   }
   .brand img {
-    width: 43px;
-    height: 43px;
+    width: 132px;
+    height: 132px;
   }
   .nav-item {
     font-size: 11px;
@@ -2290,8 +2301,8 @@ html[lang="te"] .journey-steps > span {
     padding: 0;
   }
   .login-brand .brand img {
-    width: 40px;
-    height: 40px;
+    width: 112px;
+    height: 112px;
   }
   .login-form {
     padding: 40px 0;

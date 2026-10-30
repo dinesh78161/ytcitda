@@ -7,7 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["icon.svg", "icon-192.png", "icon-512.png"],
+      includeAssets: [
+        "aarogya-logo.png",
+        "favicon-32.png",
+        "apple-touch-icon.png",
+        "app-icon-192.png",
+        "app-icon-512.png",
+      ],
       manifest: {
         name: "Aarogya Drishti",
         short_name: "Aarogya",
@@ -20,21 +26,15 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
-            src: "/icon-192.png",
+            src: "/app-icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/icon-512.png",
+            src: "/app-icon-512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "/icon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
             purpose: "any",
           },
         ],

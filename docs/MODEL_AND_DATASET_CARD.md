@@ -33,8 +33,9 @@ No external clinical dataset has been downloaded, trained on or redistributed.
 Automated tests generate checkerboard JPEGs and a PDF with explicit synthetic text.
 Patients and staff examples are synthetic. These fixtures have no clinical labels,
 subjects, demographic validity or disease information. There is no train/test split
-because no learning takes place. The app's SVG icon is project artwork; no patient
-photograph is bundled.
+because no learning takes place. Brand artwork was supplied by the project owner;
+the public logo and install icons are application assets. No patient photograph
+is bundled.
 
 The [Mendeley V2 dataset record](https://data.mendeley.com/datasets/mhjyrn35p4/2)
 was checked on 29 October 2026. It lists CC BY 4.0 and original photographs of

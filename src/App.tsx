@@ -195,13 +195,12 @@ export default function App() {
                 navigate("overview");
               }}
             >
-              <img src="/icon.svg" alt="" />
-              <span>
-                Aarogya
-                <span className="brand-second">
-                  Drishti<span className="brand-dot">.</span>
-                </span>
-              </span>
+              <img
+                src="/aarogya-logo.png"
+                alt="Aarogya Drishti"
+                width="144"
+                height="144"
+              />
             </a>
             <div className="sidebar-rule" />
             <div className="nav-label">{t("workspace")}</div>
@@ -2310,10 +2309,12 @@ function Login({
     <div className="login-page">
       <section className="login-brand">
         <div className="brand">
-          <img src="/icon.svg" alt="" />
-          <span>
-            Aarogya<span className="brand-second">Drishti.</span>
-          </span>
+          <img
+            src="/aarogya-logo.png"
+            alt="Aarogya Drishti"
+            width="180"
+            height="180"
+          />
         </div>
         <h1>{t("hello")}</h1>
         <p>{t("intro")}</p>

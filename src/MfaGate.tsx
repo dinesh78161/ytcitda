@@ -140,7 +140,13 @@ export default function MfaGate({
   return (
     <main className="mfa-page">
       <section className="mfa-card" aria-labelledby="mfa-title">
-        <img src="/icon.svg" alt="" width="42" height="42" />
+        <img
+          className="mfa-logo"
+          src="/aarogya-logo.png"
+          alt="Aarogya Drishti"
+          width="112"
+          height="112"
+        />
         <p className="eyebrow">{localize(lang, "AAROGYA DRISHTI")}</p>
         <ShieldCheck aria-hidden="true" size={32} />
         <h1 id="mfa-title">
