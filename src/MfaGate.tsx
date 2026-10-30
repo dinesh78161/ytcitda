@@ -142,7 +142,7 @@ export default function MfaGate({
       <section className="mfa-card" aria-labelledby="mfa-title">
         <img
           className="mfa-logo"
-          src="/aarogya-logo.png"
+          src="/aarogya-logo-transparent.png"
           alt="Aarogya Drishti"
           width="112"
           height="112"

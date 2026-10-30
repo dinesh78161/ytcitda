@@ -8,11 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt",
       includeAssets: [
-        "aarogya-logo.png",
-        "favicon-32.png",
-        "apple-touch-icon.png",
-        "app-icon-192.png",
-        "app-icon-512.png",
+        "aarogya-logo-transparent.png",
+        "favicon-transparent-32.png",
+        "apple-touch-icon-transparent.png",
+        "app-icon-transparent-192.png",
+        "app-icon-transparent-512.png",
       ],
       manifest: {
         name: "Aarogya Drishti",
@@ -26,13 +26,13 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
-            src: "/app-icon-192.png",
+            src: "/app-icon-transparent-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/app-icon-512.png",
+            src: "/app-icon-transparent-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any",

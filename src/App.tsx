@@ -196,7 +196,7 @@ export default function App() {
               }}
             >
               <img
-                src="/aarogya-logo.png"
+                src="/aarogya-logo-transparent.png"
                 alt="Aarogya Drishti"
                 width="144"
                 height="144"
@@ -2310,7 +2310,7 @@ function Login({
       <section className="login-brand">
         <div className="brand">
           <img
-            src="/aarogya-logo.png"
+            src="/aarogya-logo-transparent.png"
             alt="Aarogya Drishti"
             width="180"
             height="180"
