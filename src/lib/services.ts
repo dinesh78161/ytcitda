@@ -52,17 +52,41 @@ export async function careApi<T = Record<string, unknown>>(
   path: string,
   body: unknown,
 ): Promise<T> {
-  const { data } = await supabase!.auth.getSession();
-  if (!data.session) throw new Error("Sign in first.");
-  const response = await fetch(`/api/${path}`, {
+  let session = (await supabase!.auth.getSession()).data.session;
+  if (!session) throw new Error("Sign in first.");
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (session.expires_at && session.expires_at <= nowSec + 30) {
+    const { data: refreshed } = await supabase!.auth.refreshSession();
+    if (refreshed.session) session = refreshed.session;
+  }
+
+  let response = await fetch(`/api/${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${data.session.access_token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(60000),
   });
+
+  if (response.status === 401) {
+    const { data: refreshed } = await supabase!.auth.refreshSession();
+    if (refreshed.session) {
+      session = refreshed.session;
+      response = await fetch(`/api/${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60000),
+      });
+    }
+  }
+
   const result = await response.json().catch(() => ({}));
   if (!response.ok)
     throw new Error(result.error || "Care service is unavailable.");

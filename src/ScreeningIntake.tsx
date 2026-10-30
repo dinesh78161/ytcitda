@@ -7,12 +7,14 @@ import {
   ChevronLeft,
   Cloud,
   LoaderCircle,
+  MapPin,
   ShieldCheck,
 } from "lucide-react";
 import { Field, Modal, useApp } from "./App";
 import { message } from "./lib/use-workspace";
 import { isClinical } from "./lib/client";
 import { habits, normalizeIntake, optionLabel, symptoms } from "./lib/intake";
+import { ASR_MANDALS, type HabitationItem } from "./lib/asr-districts";
 
 export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
   const { w, t, lang, notify } = useApp();
@@ -23,6 +25,12 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
     display_name: "",
     age_years: "",
     village: "",
+    mandal: "paderu",
+    habitation: "",
+    custom_habitation: "",
+    subcenter: "",
+    abha_id: "",
+    aadhaar_last4: "",
     contact_phone: "",
     language: lang,
     tobacco: "never",
@@ -50,6 +58,8 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const step = Number(form.intake_step) || 0;
   const busy = w.busy || submitting || !ready;
+  const currentMandal =
+    ASR_MANDALS.find((m) => m.id === form.mandal) || ASR_MANDALS[0];
   const steps = [
     copy("Patient & consent", "రోగి & సమ్మతి"),
     copy("Habits & findings", "అలవాట్లు & పరిశీలనలు"),
@@ -144,9 +154,21 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
       }
       return;
     }
+    const finalHabitation =
+      form.habitation === "other"
+        ? String(form.custom_habitation || "").trim()
+        : String(form.habitation || "").trim();
+    const mandalObj =
+      ASR_MANDALS.find((m) => m.id === form.mandal) || ASR_MANDALS[0];
+    const effectiveVillage =
+      String(form.village || "").trim() ||
+      (finalHabitation
+        ? `${finalHabitation}, ${mandalObj.nameEn}`
+        : mandalObj.nameEn);
+
     if (
       !String(form.display_name).trim() ||
-      !String(form.village).trim() ||
+      !effectiveVillage ||
       form.age_years === "" ||
       form.consent !== true
     ) {
@@ -159,6 +181,12 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
       await writes.current;
       const state = await w.execute("register", {
         ...form,
+        village: effectiveVillage,
+        mandal: mandalObj.nameEn,
+        habitation: finalHabitation,
+        subcenter: String(form.subcenter || "").trim(),
+        abha_id: String(form.abha_id || "").trim(),
+        aadhaar_last4: String(form.aadhaar_last4 || "").trim(),
         age_years: Number(form.age_years),
       });
       await w.saveForm(null);
@@ -229,7 +257,11 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
               <>
                 <div className="form-notice">
                   <ShieldCheck size={18} />
-                  {t("consentHelp")}
+                  {localize(
+                    lang,
+                    "Informed consent required under Ayushman Bharat Digital Mission (ABDM) protocols.",
+                    "ఆయుష్మాన్ భారత్ డిజిటల్ మిషన్ (ABDM) నిబంధనల ప్రకారం సమాచార సమ్మతి అవసరం.",
+                  )}
                 </div>
                 <div className="form-grid">
                   <Field label={localize(lang, "Full name", "పూర్తి పేరు")}>
@@ -252,22 +284,6 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                       onChange={(e) => change("age_years", e.target.value)}
                     />
                   </Field>
-                  <Field label={t("village")}>
-                    <input
-                      required
-                      maxLength={120}
-                      value={String(form.village)}
-                      onChange={(e) => change("village", e.target.value)}
-                    />
-                  </Field>
-                  <Field label={t("phone")}>
-                    <input
-                      type="tel"
-                      maxLength={20}
-                      value={String(form.contact_phone)}
-                      onChange={(e) => change("contact_phone", e.target.value)}
-                    />
-                  </Field>
                   <Field label={t("language")}>
                     <select
                       aria-label={t("language")}
@@ -284,6 +300,194 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                         </option>
                       ))}
                     </select>
+                  </Field>
+                  <Field label={t("phone")}>
+                    <input
+                      type="tel"
+                      maxLength={20}
+                      value={String(form.contact_phone)}
+                      placeholder={copy("10-digit mobile number", "10 అంకెల మొబైల్ సంఖ్య")}
+                      onChange={(e) => change("contact_phone", e.target.value)}
+                    />
+                  </Field>
+
+                  <Field
+                    label={copy(
+                      "ASR District Mandal (11 Mandals)",
+                      "ASR జిల్లా మండలం (11 మండలాలు)",
+                    )}
+                  >
+                    <select
+                      value={String(form.mandal || "paderu")}
+                      onChange={(e) => {
+                        const newMandalId = e.target.value;
+                        const mandalInfo =
+                          ASR_MANDALS.find((m) => m.id === newMandalId) ||
+                          ASR_MANDALS[0];
+                        update({
+                          mandal: newMandalId,
+                          habitation: "",
+                          custom_habitation: "",
+                          village: form.village ? form.village : mandalInfo.nameEn,
+                        });
+                      }}
+                    >
+                      {ASR_MANDALS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nameEn} · {m.nameTe}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field
+                    label={copy(
+                      "Habitation (Tribal Hamlet)",
+                      "నివాసం / హ్యాబిటేషన్ (ఆవాసం)",
+                    )}
+                  >
+                    <select
+                      value={String(form.habitation || "")}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = currentMandal.habitations.find(
+                          (h: HabitationItem) => h.nameEn === val,
+                        );
+                        update({
+                          habitation: val,
+                          ...(val && val !== "other"
+                            ? {
+                                village: `${val}, ${currentMandal.nameEn}`,
+                                ...(match?.phc && !form.subcenter
+                                  ? { subcenter: `${match.phc} PHC` }
+                                  : {}),
+                              }
+                            : {}),
+                        });
+                      }}
+                    >
+                      <option value="">
+                        {copy("Select Habitation…", "ఆవాసం ఎంచుకోండి…")}
+                      </option>
+                      {currentMandal.habitations.map((h: HabitationItem) => (
+                        <option key={h.nameEn} value={h.nameEn}>
+                          {h.nameEn} {h.phc ? `(${h.phc} PHC)` : ""}
+                        </option>
+                      ))}
+                      <option value="other">
+                        {copy("Other / Custom Habitation", "ఇతర నివాసం (టైప్ చేయండి)")}
+                      </option>
+                    </select>
+                  </Field>
+
+                  {form.habitation === "other" && (
+                    <Field
+                      label={copy(
+                        "Custom Habitation Name",
+                        "నివాసం పేరు రాయండి",
+                      )}
+                    >
+                      <input
+                        maxLength={120}
+                        value={String(form.custom_habitation || "")}
+                        placeholder={copy(
+                          "Enter tribal hamlet name",
+                          "ఆవాసం పేరు",
+                        )}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          update({
+                            custom_habitation: val,
+                            village: val ? `${val}, ${currentMandal.nameEn}` : currentMandal.nameEn,
+                          });
+                        }}
+                      />
+                    </Field>
+                  )}
+
+                  <Field
+                    label={copy(
+                      "Sub-centre (Ayushman Arogya Mandir)",
+                      "ఉప కేంద్రం / ఆయుష్మాన్ ఆరోగ్య మందిరం",
+                    )}
+                  >
+                    <input
+                      maxLength={120}
+                      value={String(form.subcenter || "")}
+                      placeholder={copy(
+                        "e.g. Minumuluru Sub-centre",
+                        "ఉదా: మినుములూరు ఉప కేంద్రం",
+                      )}
+                      onChange={(e) => change("subcenter", e.target.value)}
+                    />
+                  </Field>
+
+                  <Field label={t("village")}>
+                    <input
+                      aria-label={t("village")}
+                      required
+                      maxLength={120}
+                      value={String(form.village)}
+                      placeholder={copy(
+                        "Village or Gram Panchayat",
+                        "గ్రామం లేదా పంచాయతీ",
+                      )}
+                      onChange={(e) => change("village", e.target.value)}
+                    />
+                  </Field>
+
+                  <Field
+                    label={copy(
+                      "ABHA ID (Ayushman Bharat Health Account)",
+                      "ABHA ఐడీ (ఆయుష్మాన్ భారత్ హెల్త్ ఖాతా)",
+                    )}
+                  >
+                    <input
+                      maxLength={32}
+                      value={String(form.abha_id || "")}
+                      placeholder={copy(
+                        "14-digit ABHA or name@abdm",
+                        "14 అంకెల ABHA లేదా @abdm",
+                      )}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        const digits = val.replace(/\D/g, "");
+                        if (
+                          digits.length > 0 &&
+                          digits.length <= 14 &&
+                          !val.includes("@")
+                        ) {
+                          const p1 = digits.slice(0, 2);
+                          const p2 = digits.slice(2, 6);
+                          const p3 = digits.slice(6, 10);
+                          const p4 = digits.slice(10, 14);
+                          val = [p1, p2, p3, p4].filter(Boolean).join("-");
+                        }
+                        change("abha_id", val);
+                      }}
+                    />
+                  </Field>
+
+                  <Field
+                    label={copy(
+                      "Aadhaar (Last 4 digits · UIDAI compliant)",
+                      "ఆధార్ (చివరి 4 అంకెలు)",
+                    )}
+                  >
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      pattern="[0-9]{4}"
+                      value={String(form.aadhaar_last4 || "")}
+                      placeholder="•••• 4829"
+                      onChange={(e) =>
+                        change(
+                          "aadhaar_last4",
+                          e.target.value.replace(/\D/g, "").slice(0, 4),
+                        )
+                      }
+                    />
                   </Field>
                 </div>
                 {duplicates.length > 0 && (
@@ -315,7 +519,11 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                         change("photo_consent", e.target.checked)
                       }
                     />
-                    {t("photoConsent")}
+                    {localize(
+                      lang,
+                      "Separate consent for intraoral clinical photographs",
+                      "ఇంట్రాఓరల్ క్లినికల్ చిత్రాల కోసం ప్రత్యేక సమ్మతి",
+                    )}
                   </label>
                 </div>
               </>
@@ -478,9 +686,41 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                       </dd>
                     </div>
                     <div>
+                      <dt>{copy("ASR Mandal", "మండలం")}</dt>
+                      <dd>{currentMandal.nameEn} · {currentMandal.nameTe}</dd>
+                    </div>
+                    <div>
+                      <dt>{copy("Habitation", "నివాసం")}</dt>
+                      <dd>
+                        {String(
+                          (form.habitation === "other"
+                            ? form.custom_habitation
+                            : form.habitation) || "—",
+                        )}
+                      </dd>
+                    </div>
+                    {Boolean(form.subcenter) && (
+                      <div>
+                        <dt>{copy("Sub-centre", "ఉప కేంద్రం")}</dt>
+                        <dd>{String(form.subcenter)}</dd>
+                      </div>
+                    )}
+                    <div>
                       <dt>{t("village")}</dt>
                       <dd>{String(form.village)}</dd>
                     </div>
+                    {Boolean(form.abha_id) && (
+                      <div>
+                        <dt>{copy("ABHA ID", "ABHA ఐడీ")}</dt>
+                        <dd>{String(form.abha_id)}</dd>
+                      </div>
+                    )}
+                    {Boolean(form.aadhaar_last4) && (
+                      <div>
+                        <dt>{copy("Aadhaar", "ఆధార్")}</dt>
+                        <dd>•••• •••• {String(form.aadhaar_last4)}</dd>
+                      </div>
+                    )}
                     <div>
                       <dt>{t("phone")}</dt>
                       <dd>{String(form.contact_phone) || "—"}</dd>

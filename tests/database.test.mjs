@@ -70,6 +70,8 @@ before(async () => {
       await sqlFile("supabase/migrations/202610290009_languages.sql"),
     );
     await db.exec(await sqlFile("supabase/migrations/202610300010_clinical_workspace.sql"));
+    await db.exec(await sqlFile("supabase/migrations/202610300011_patient_abdm_identifiers.sql"));
+    await db.exec(await sqlFile("supabase/migrations/202610300012_anatomical_subsites.sql"));
   }
   for (const [index, name] of [
     "worker",
@@ -651,6 +653,30 @@ test("registration preserves each additional patient and consent language", asyn
       assert.ok(consents.rows.every((row) => row.language === language));
     });
   }
+});
+
+test("registration persists ABDM and ITDA tribal identifiers (mandal, habitation, subcenter, abha_id, aadhaar_last4)", async () => {
+  await asRole("authenticated", uid(1), async () => {
+    const payload = {
+      ...registrationPayload(),
+      mandal: "Paderu",
+      habitation: "Kothuru",
+      subcenter: "Minumuluru Sub-centre",
+      abha_id: "14-8291-3849-1029",
+      aadhaar_last4: "4829",
+    };
+    await rpc("register", payload);
+    const { rows } = await db.query(
+      "select mandal, habitation, subcenter, abha_id, aadhaar_last4 from public.patients where id=$1",
+      [payload.patient_id],
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].mandal, "Paderu");
+    assert.equal(rows[0].habitation, "Kothuru");
+    assert.equal(rows[0].subcenter, "Minumuluru Sub-centre");
+    assert.equal(rows[0].abha_id, "14-8291-3849-1029");
+    assert.equal(rows[0].aadhaar_last4, "4829");
+  });
 });
 
 test("request ID cannot be reused with a different payload", async () => {

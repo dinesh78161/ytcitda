@@ -295,6 +295,11 @@ export function applyDemoCommand(
       display_name: name,
       age_years: age,
       village,
+      mandal: p.mandal ? String(p.mandal).trim() : null,
+      habitation: p.habitation ? String(p.habitation).trim() : null,
+      subcenter: p.subcenter ? String(p.subcenter).trim() : null,
+      abha_id: p.abha_id ? String(p.abha_id).trim() : null,
+      aadhaar_last4: p.aadhaar_last4 ? String(p.aadhaar_last4).trim() : null,
       contact_phone: String(p.contact_phone ?? ""),
       preferred_language: isLanguage(p.language) ? p.language : "en",
       facility_id: profile.facility_id,
@@ -496,6 +501,11 @@ export function applyDemoCommand(
       oral_view: String(p.oral_view ?? "cheek"),
       created_at: now,
     });
+  } else if (command.action === "delete_image") {
+    requireRole(["health_worker", "medical_officer", "specialist"]);
+    const idToDelete = String(p.image_id ?? p.id);
+    data.images = data.images.filter((i) => i.id !== idToDelete);
+    data.ai_analyses = data.ai_analyses.filter((a) => a.image_id !== idToDelete);
   } else if (command.action === "analyze") {
     requireRole(["health_worker", "medical_officer", "specialist"]);
     const image = data.images.find((i) => i.id === p.image_id);

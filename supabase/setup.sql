@@ -1289,6 +1289,52 @@ revoke all on function app_private.protect_workspace_mode(),app_private.enforce_
   app_private.stamp_consent_version(),app_private.restrict_research_analysis() from public,anon,authenticated,service_role;
 notify pgrst,'reload schema';
 
+-- Source: supabase/migrations/202610300011_patient_abdm_identifiers.sql
+-- Add ABDM and ITDA tribal administrative fields to public.patients
+
+alter table public.patients
+  add column if not exists mandal text,
+  add column if not exists habitation text,
+  add column if not exists subcenter text,
+  add column if not exists abha_id text,
+  add column if not exists aadhaar_last4 text check (aadhaar_last4 is null or length(trim(aadhaar_last4)) = 4);
+
+-- Upgrade the register action in submit_workflow_v1 to persist these columns
+do $$
+declare source text;
+begin
+  source := pg_get_functiondef('public.submit_workflow_v1(uuid,text,jsonb)'::regprocedure);
+  source := replace(
+    source,
+    'insert into public.patients(id, facility_id, registered_by, display_name, age_years, village, contact_phone, preferred_language)',
+    'insert into public.patients(id, facility_id, registered_by, display_name, age_years, village, contact_phone, preferred_language, mandal, habitation, subcenter, abha_id, aadhaar_last4)'
+  );
+  source := replace(
+    source,
+    'trim(payload->>''village''), nullif(payload->>''contact_phone'',''''), coalesce(payload->>''language'',''en''));',
+    'trim(payload->>''village''), nullif(payload->>''contact_phone'',''''), coalesce(payload->>''language'',''en''), nullif(trim(payload->>''mandal''),''''), nullif(trim(payload->>''habitation''),''''), nullif(trim(payload->>''subcenter''),''''), nullif(trim(payload->>''abha_id''),''''), nullif(trim(payload->>''aadhaar_last4''),''''));'
+  );
+  execute source;
+end $$;
+
+-- Source: supabase/migrations/202610300012_anatomical_subsites.sql
+-- Support all 6 standardized anatomical sub-sites for oral cancer examination
+
+alter table public.images drop constraint if exists images_oral_view_check;
+
+alter table public.images add constraint images_oral_view_check
+  check (oral_view in (
+    'cheek',
+    'tongue',
+    'palate',
+    'gums',
+    'floor_of_mouth',
+    'left_buccal_mucosa',
+    'right_buccal_mucosa',
+    'lateral_tongue',
+    'lower_labial_sulcus'
+  ));
+
 -- Source: supabase/seed.sql
 -- Safe to repeat. Fictional facilities only; no Auth users/passwords are created.
 insert into public.facilities(id, name, district, facility_type) values

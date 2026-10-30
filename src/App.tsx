@@ -50,6 +50,7 @@ import {
   Volume2,
   Wifi,
   X,
+  Zap,
 } from "lucide-react";
 import {
   configurationError,
@@ -59,7 +60,14 @@ import {
 } from "./lib/client";
 import { demoProfiles } from "./lib/demo";
 import { inspectImage } from "./lib/image-quality";
-import { roleLabel, statusLabel, translator, type Label } from "./lib/i18n";
+import {
+  ANATOMICAL_SUB_SITES,
+  roleLabel,
+  statusLabel,
+  translator,
+  type Label,
+} from "./lib/i18n";
+import { CLINICAL_SAMPLES, getSampleFile } from "./lib/clinical-samples";
 import { message, useWorkspace } from "./lib/use-workspace";
 import type { Language, Page, Patient, Role } from "./lib/types";
 import {
@@ -930,9 +938,10 @@ function PatientTable({
     )
     .filter((p) => {
       const s = latestScreening(w.data, p.id);
-      const matches = `${p.display_name} ${p.village} ${shortId(p.id)}`
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matches =
+        `${p.display_name} ${p.village} ${p.habitation || ""} ${p.subcenter || ""} ${p.abha_id || ""} ${p.aadhaar_last4 || ""} ${shortId(p.id)}`
+          .toLowerCase()
+          .includes(search.toLowerCase());
       return (
         matches &&
         (!screeningOnly ||
@@ -1155,8 +1164,11 @@ function PatientDetail({
     previewUrl?: string;
   } | null>(null);
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
-  const [oralView, setOralView] = useState("cheek");
+  const [oralView, setOralView] = useState("left_buccal_mucosa");
+  const [selectedSubsiteFilter, setSelectedSubsiteFilter] = useState("all");
+  const [showFullSampleDeck, setShowFullSampleDeck] = useState(false);
   const [followupAt, setFollowupAt] = useState("");
+  const galleryRef = useRef<HTMLDivElement>(null);
   const screening = latestScreening(w.data, patient.id),
     reviews = w.data.clinical_reviews.filter(
       (r) => r.patient_id === patient.id,
@@ -1169,8 +1181,16 @@ function PatientDetail({
     isClinician = clinician(w.profile?.role),
     isNavigator = w.profile?.role === "navigator";
   const photoConsent = hasConsent(w.data, patient.id, "image_capture");
-  const upload = async (file?: File) => {
+
+  const matchesSubsite = (img: (typeof images)[0], subsiteId: string) => {
+    if (subsiteId === "all") return true;
+    const current = (img.quality_details?.subsite as string) || img.oral_view;
+    return current === subsiteId;
+  };
+
+  const upload = async (file?: File, targetOralView?: string) => {
     if (!file) return;
+    const viewToUse = targetOralView || oralView;
     setImageBusy(true);
     const objectUrl = URL.createObjectURL(file);
     setUploadProgress({
@@ -1187,7 +1207,7 @@ function PatientDetail({
       });
       await w.execute("image", {
         patient_id: patient.id,
-        oral_view: oralView,
+        oral_view: viewToUse,
         ...result,
       });
       setUploadProgress({
@@ -1207,6 +1227,59 @@ function PatientDetail({
       }, 700);
     }
   };
+
+  const loadSample = async (siteId: string) => {
+    try {
+      setImageBusy(true);
+      setOralView(siteId);
+      setSelectedSubsiteFilter(siteId);
+      const file = await getSampleFile(siteId);
+      await upload(file, siteId);
+    } catch (e) {
+      notify(message(e), true);
+      setImageBusy(false);
+    }
+  };
+
+  const loadAllSamples = async () => {
+    try {
+      setImageBusy(true);
+      setSelectedSubsiteFilter("all");
+      for (const sample of CLINICAL_SAMPLES) {
+        const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+        if (!alreadyHasImage) {
+          const file = await getSampleFile(sample.id);
+          const result = await inspectImage(file);
+          await w.execute("image", {
+            patient_id: patient.id,
+            oral_view: sample.id,
+            ...result,
+          });
+        }
+      }
+      notify(
+        localize(
+          lang,
+          "All 6 anatomical clinical photos loaded!",
+          "అన్ని 6 శరీర నిర్మాణ ఫోటోలు లోడ్ అయ్యాయి!",
+        ),
+      );
+    } catch (e) {
+      notify(message(e), true);
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (images.length > 0 && tab === "photos" && galleryRef.current) {
+      const rect = galleryRef.current.getBoundingClientRect();
+      if (rect.top > 250 || rect.top < 0) {
+        galleryRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [images.length, selectedSubsiteFilter, tab]);
+
   return (
     <>
       <button className="back-link" onClick={back}>
@@ -1215,7 +1288,7 @@ function PatientDetail({
       </button>
       <PageHeading
         title={patient.display_name}
-        subtitle={`${shortId(patient.id)} · ${patient.age_years} ${t("years")} · ${patient.village}`}
+        subtitle={`${shortId(patient.id)} · ${patient.age_years} ${t("years")} · ${patient.village}${patient.habitation ? ` (${patient.habitation})` : ""}${patient.subcenter ? ` · ${patient.subcenter}` : ""}`}
         action={screening ? <Badge status={screening.status} /> : null}
       />
       <GuidedJourney
@@ -1274,122 +1347,377 @@ function PatientDetail({
               <PatientCare key={patient.id} patient={patient} />
             ) : tab === "photos" && !isNavigator ? (
               <>
-                <h2>{t("photos")}</h2>
-                <p className="muted">
-                  {localize(
-                    lang,
-                    "Standardized intraoral clinical views · JPEG, PNG or WebP up to 10 MB",
-                    "ప్రామాణిక ఇంట్రాఓరల్ క్లినికల్ వీక్షణలు · JPEG, PNG లేదా WebP 10 MB వరకు",
-                  )}
-                </p>
-                <div className="form-notice">
-                  {localize(
-                    lang,
-                    "Quality guidance verifies exposure, sharpness and mucosal framing prior to clinician review.",
-                    "వైద్యుల సమీక్షకు ముందు ఎక్స్‌పోజర్, స్పష్టత మరియు ఫోకస్‌ను నాణ్యతా మార్గదర్శకాలు ధృవీకరిస్తాయి.",
-                  )}
-                </div>
-                <Field label={localize(lang, "Oral view", "నోటి భాగం")}>
-                  <select
-                    value={oralView}
-                    onChange={(e) => setOralView(e.target.value)}
-                  >
-                    {[
-                      ["cheek", "Cheek", "చెంప"],
-                      ["tongue", "Tongue", "నాలుక"],
-                      ["palate", "Palate", "అంగిలి"],
-                      ["gums", "Gums", "చిగుళ్లు"],
-                      ["floor_of_mouth", "Floor of mouth", "నోటి అడుగు భాగం"],
-                    ].map(([value, en, te]) => (
-                      <option key={value} value={value}>
-                        {localize(lang, en, te)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {isCloud && !w.services.files ? (
-                  <div className="empty">
-                    <Camera size={30} />
-                    <p>{t("cloudPhoto")}</p>
-                  </div>
-                ) : !photoConsent ? (
-                  <div className="form-notice">{t("photoMissing")}</div>
-                ) : (
-                  <div className="capture-methods-wrapper">
-                    <div className="capture-methods-grid">
-                      <button
-                        type="button"
-                        className="capture-method-card live-camera-trigger"
-                        onClick={() => setLiveCameraOpen(true)}
-                        disabled={imageBusy || w.busy}
-                      >
-                        <div className="method-icon-box primary-cam">
-                          <Camera size={26} />
-                        </div>
-                        <div className="method-details">
-                          <div className="method-title-row">
-                            <strong>
-                              {localize(
-                                lang,
-                                "Take live photo with camera",
-                                "కెమెరాతో లైవ్ ఫోటో తీయండి",
-                              )}
-                            </strong>
-                            <span className="badge badge-completed">
-                              {localize(lang, "Live Cam", "లైవ్ కెమెరా")}
-                            </span>
-                          </div>
-                          <span>
-                            {localize(
-                              lang,
-                              "Live viewfinder with focus, lighting and oral framing guidance",
-                              "రియల్ టైమ్ Google MedGemma నాణ్యత గైడ్ మరియు ఓరల్ ఫ్రేమింగ్",
-                            )}
-                          </span>
-                        </div>
-                      </button>
-
-                      <label
-                        className={`upload-area capture-method-upload ${imageBusy ? "disabled" : ""}`}
-                      >
-                        <div className="method-icon-box">
-                          <UploadCloud size={26} />
-                        </div>
-                        <div className="method-details">
-                          <div className="method-title-row">
-                            <strong>
-                              {localize(
-                                lang,
-                                "Upload clinical photograph",
-                                "క్లినికల్ ఫోటోను అప్‌లోడ్ చేయండి",
-                              )}
-                            </strong>
-                            <span className="badge badge-subtle">
-                              {localize(lang, "File upload", "ఫైల్ అప్‌లోడ్")}
-                            </span>
-                          </div>
-                          <span>
-                            {localize(
-                              lang,
-                              "JPEG, PNG or WebP · High-resolution clinical images",
-                              "JPEG, PNG లేదా WebP · అధిక నాణ్యత క్లినికల్ చిత్రాలు",
-                            )}
-                          </span>
-                        </div>
-                        <input
-                          aria-label={t("capture")}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          capture="environment"
-                          disabled={imageBusy || w.busy}
-                          onChange={(e) => {
-                            const file = e.currentTarget.files?.[0];
-                            e.currentTarget.value = "";
-                            void upload(file);
-                          }}
-                        />
-                      </label>
+                {images.length === 0 ? (
+                  <>
+                    <h2>{t("photos")}</h2>
+                    <p className="muted">
+                      {localize(
+                        lang,
+                        "Standardized intraoral clinical views · JPEG, PNG or WebP up to 10 MB",
+                        "ప్రామాణిక ఇంట్రాఓరల్ క్లినికల్ వీక్షణలు · JPEG, PNG లేదా WebP 10 MB వరకు",
+                      )}
+                    </p>
+                    <div className="form-notice">
+                      {localize(
+                        lang,
+                        "Quality guidance verifies exposure, sharpness and mucosal framing prior to clinician review.",
+                        "వైద్యుల సమీక్షకు ముందు ఎక్స్‌పోజర్, స్పష్టత మరియు ఫోకస్‌ను నాణ్యతా మార్గదర్శకాలు ధృవీకరిస్తాయి.",
+                      )}
                     </div>
+                    <div className="anatomical-gate-card">
+                      <div className="anatomical-gate-header">
+                        <span style={{ fontSize: "17px" }}>⚙</span>
+                        <h3>
+                          {localize(
+                            lang,
+                            "Anatomical Site & Quality Gate",
+                            "నోటి భాగం & నాణ్యతా ప్రమాణాలు",
+                          )}
+                        </h3>
+                      </div>
+                      <Field
+                        label={localize(
+                          lang,
+                          "Anatomical Sub-site Examined",
+                          "పరీక్షించిన నోటి భాగం (అనాటమికల్ సబ్-సైట్)",
+                        )}
+                      >
+                        <select
+                          value={oralView}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setOralView(val);
+                            if (images.some((img) => matchesSubsite(img, val))) {
+                              setSelectedSubsiteFilter(val);
+                            }
+                          }}
+                        >
+                          {ANATOMICAL_SUB_SITES.map((site) => (
+                            <option key={site.id} value={site.id}>
+                              {site.full}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+
+                      <div className="clinical-sample-deck">
+                        <div className="sample-deck-header">
+                          <div className="sample-deck-title">
+                            <Sparkles size={16} />
+                            <span>
+                              {localize(
+                                lang,
+                                "Preset Clinical Photos for Analysis (1-Click Test):",
+                                "విశ్లేషణ కోసం ప్రామాణిక క్లినికల్ నమూనా చిత్రాలు:",
+                              )}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="button small load-all-samples-btn"
+                            disabled={imageBusy || w.busy}
+                            onClick={() => void loadAllSamples()}
+                          >
+                            <Zap size={14} />
+                            {localize(
+                              lang,
+                              "Load All 6 Anatomical Photos",
+                              "అన్ని 6 భాగాల ఫోటోలను లోడ్ చేయండి",
+                            )}
+                          </button>
+                        </div>
+                        <div className="sample-options-grid">
+                          {CLINICAL_SAMPLES.map((sample) => {
+                            const isSelected = oralView === sample.id;
+                            const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+                            return (
+                              <button
+                                key={sample.id}
+                                type="button"
+                                className={`sample-option-btn ${isSelected ? "selected" : ""} ${alreadyHasImage ? "has-image" : ""}`}
+                                onClick={() => {
+                                  setOralView(sample.id);
+                                  if (alreadyHasImage) {
+                                    setSelectedSubsiteFilter(sample.id);
+                                  } else {
+                                    void loadSample(sample.id);
+                                  }
+                                }}
+                                disabled={imageBusy || w.busy}
+                                title={`${sample.titleEn} (${sample.titleTe})`}
+                              >
+                                <div className="sample-option-icon">{sample.icon}</div>
+                                <div className="sample-option-text">
+                                  <strong>{sample.titleEn}</strong>
+                                  <small>{sample.titleTe}</small>
+                                </div>
+                                {alreadyHasImage ? (
+                                  <span className="sample-status-pill done">
+                                    ✓ {localize(lang, "Photo Ready", "సిద్ధంగా ఉంది")}
+                                  </span>
+                                ) : (
+                                  <span className="sample-status-pill load">
+                                    + {localize(lang, "Load & Analyse", "లోడ్ & విశ్లేషించు")}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="form-notice">
+                      <ShieldCheck size={18} />
+                      {localize(
+                        lang,
+                        "1 clear photograph of the primary lesion is completely sufficient for AI analysis & clinician triage. Multiple photos are only needed if suspicious lesions exist in multiple separate locations.",
+                        "ప్రాథమిక అనుమానాస్పద గాయం యొక్క 1 స్పష్టమైన చిత్రం AI విశ్లేషణ & రిఫరల్‌కు పూర్తిగా సరిపోతుంది. వేర్వేరు ప్రదేశాల్లో గాయాలు ఉన్నప్పుడు మాత్రమే బహుళ ఫోటోలు అవసరం.",
+                      )}
+                    </div>
+                    {isCloud && !w.services.files ? (
+                      <div className="empty">
+                        <Camera size={30} />
+                        <p>{t("cloudPhoto")}</p>
+                      </div>
+                    ) : !photoConsent ? (
+                      <div className="form-notice">{t("photoMissing")}</div>
+                    ) : (
+                      <div className="capture-methods-wrapper">
+                        <div className="capture-methods-grid">
+                          <button
+                            type="button"
+                            className="capture-method-card live-camera-trigger"
+                            onClick={() => setLiveCameraOpen(true)}
+                            disabled={imageBusy || w.busy}
+                          >
+                            <div className="method-icon-box primary-cam">
+                              <Camera size={26} />
+                            </div>
+                            <div className="method-details">
+                              <div className="method-title-row">
+                                <strong>
+                                  {localize(
+                                    lang,
+                                    "Take live photo with camera",
+                                    "కెమెరాతో లైవ్ ఫోటో తీయండి",
+                                  )}
+                                </strong>
+                                <span className="badge badge-completed">
+                                  {localize(lang, "Live Cam", "లైవ్ కెమెరా")}
+                                </span>
+                              </div>
+                              <span>
+                                {localize(
+                                  lang,
+                                  "Live viewfinder with focus, lighting and oral framing guidance",
+                                  "రియల్ టైమ్ Google MedGemma నాణ్యత గైడ్ మరియు ఓరల్ ఫ్రేమింగ్",
+                                )}
+                              </span>
+                            </div>
+                          </button>
+
+                          <label
+                            className={`upload-area capture-method-upload ${imageBusy ? "disabled" : ""}`}
+                          >
+                            <div className="method-icon-box">
+                              <UploadCloud size={26} />
+                            </div>
+                            <div className="method-details">
+                              <div className="method-title-row">
+                                <strong>
+                                  {localize(
+                                    lang,
+                                    "Upload clinical photograph",
+                                    "క్లినికల్ ఫోటోను అప్‌లోడ్ చేయండి",
+                                  )}
+                                </strong>
+                                <span className="badge badge-subtle">
+                                  {localize(lang, "File upload", "ఫైల్ అప్‌లోడ్")}
+                                </span>
+                              </div>
+                              <span>
+                                {localize(
+                                  lang,
+                                  "JPEG, PNG or WebP · High-resolution clinical images",
+                                  "JPEG, PNG లేదా WebP · అధిక నాణ్యత క్లినికల్ చిత్రాలు",
+                                )}
+                              </span>
+                            </div>
+                            <input
+                              aria-label={t("capture")}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              capture="environment"
+                              disabled={imageBusy || w.busy}
+                              onChange={(e) => {
+                                const file = e.currentTarget.files?.[0];
+                                e.currentTarget.value = "";
+                                void upload(file);
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            className="capture-method-card sample-method-trigger"
+                            onClick={() => void loadSample(oralView)}
+                            disabled={imageBusy || w.busy}
+                          >
+                            <div className="method-icon-box sample-icon-box">
+                              <Sparkles size={26} />
+                            </div>
+                            <div className="method-details">
+                              <div className="method-title-row">
+                                <strong>
+                                  {localize(
+                                    lang,
+                                    `Load Reference Photo (${ANATOMICAL_SUB_SITES.find((s) => s.id === oralView)?.en || "Selected Site"})`,
+                                    `నమూనా ఫోటో లోడ్ చేయండి (${ANATOMICAL_SUB_SITES.find((s) => s.id === oralView)?.te || "ఎంచుకున్న భాగం"})`,
+                                  )}
+                                </strong>
+                                <span className="badge badge-accent">
+                                  {localize(lang, "Preset AI Sample", "నమూనా AI చిత్రం")}
+                                </span>
+                              </div>
+                              <span>
+                                {localize(
+                                  lang,
+                                  "Authentic NIH clinical reference image ready for immediate Gemini analysis",
+                                  "వెంటనే Gemini AI విశ్లేషణ చేయడానికి ప్రామాణిక NIH క్లినికల్ చిత్రం",
+                                )}
+                              </span>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Compact Focused Analysis Workspace when photos are attached */
+                  <div className="compact-oral-workspace">
+                    <div className="compact-workspace-header">
+                      <div className="compact-workspace-title">
+                        <h3>{t("photos")}</h3>
+                        <span className="compact-count-pill">
+                          {images.length}{" "}
+                          {localize(
+                            lang,
+                            images.length === 1 ? "photo attached" : "photos attached",
+                            images.length === 1 ? "చిత్రం ఉంది" : "చిత్రాలు ఉన్నాయి",
+                          )}
+                        </span>
+                      </div>
+                      <div className="compact-workspace-actions">
+                        <button
+                          type="button"
+                          className="button small compact-cam-btn"
+                          onClick={() => setLiveCameraOpen(true)}
+                          disabled={imageBusy || w.busy}
+                        >
+                          <Camera size={14} />
+                          <span>{localize(lang, "Live Cam", "లైవ్ కెమెరా")}</span>
+                        </button>
+                        <label className={`button small compact-upload-btn ${imageBusy ? "disabled" : ""}`}>
+                          <UploadCloud size={14} />
+                          <span>{localize(lang, "Upload Photo", "ఫోటో అప్‌లోడ్")}</span>
+                          <input
+                            aria-label={t("capture")}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            capture="environment"
+                            disabled={imageBusy || w.busy}
+                            onChange={(e) => {
+                              const file = e.currentTarget.files?.[0];
+                              e.currentTarget.value = "";
+                              void upload(file);
+                            }}
+                            style={{ display: "none" }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="button small compact-sample-btn"
+                          onClick={() => void loadSample(oralView)}
+                          disabled={imageBusy || w.busy}
+                          title={localize(lang, "Load Reference Clinical Photo for current site", "ప్రస్తుత భాగానికి నమూనా ఫోటో లోడ్ చేయండి")}
+                        >
+                          <Sparkles size={14} />
+                          <span>{localize(lang, "Load Sample", "నమూనా లోడ్")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="button small compact-all-btn"
+                          onClick={() => void loadAllSamples()}
+                          disabled={imageBusy || w.busy}
+                          title={localize(lang, "Load All 6 Anatomical Photos", "అన్ని 6 భాగాల ఫోటోలను లోడ్ చేయండి")}
+                        >
+                          <Zap size={14} />
+                          <span>{localize(lang, "All 6 Sites", "అన్ని 6 భాగాలు")}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`button small compact-deck-toggle ${showFullSampleDeck ? "active" : ""}`}
+                          onClick={() => setShowFullSampleDeck((v) => !v)}
+                        >
+                          <span>{showFullSampleDeck ? "▲" : "▼"}</span>
+                          <span>{localize(lang, "Sample Deck", "నమూనాలు")}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {showFullSampleDeck && (
+                      <div className="clinical-sample-deck compact-deck-open">
+                        <div className="sample-deck-header">
+                          <div className="sample-deck-title">
+                            <Sparkles size={16} />
+                            <span>
+                              {localize(
+                                lang,
+                                "Preset Clinical Photos for Analysis (1-Click Test):",
+                                "విశ్లేషణ కోసం ప్రామాణిక క్లినికల్ నమూనా చిత్రాలు:",
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="sample-options-grid">
+                          {CLINICAL_SAMPLES.map((sample) => {
+                            const isSelected = oralView === sample.id;
+                            const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+                            return (
+                              <button
+                                key={sample.id}
+                                type="button"
+                                className={`sample-option-btn ${isSelected ? "selected" : ""} ${alreadyHasImage ? "has-image" : ""}`}
+                                onClick={() => {
+                                  setOralView(sample.id);
+                                  setSelectedSubsiteFilter(sample.id);
+                                  if (!alreadyHasImage) {
+                                    void loadSample(sample.id);
+                                  }
+                                }}
+                                disabled={imageBusy || w.busy}
+                                title={`${sample.titleEn} (${sample.titleTe})`}
+                              >
+                                <div className="sample-option-icon">{sample.icon}</div>
+                                <div className="sample-option-text">
+                                  <strong>{sample.titleEn}</strong>
+                                  <small>{sample.titleTe}</small>
+                                </div>
+                                {alreadyHasImage ? (
+                                  <span className="sample-status-pill done">
+                                    ✓ {localize(lang, "Photo Ready", "సిద్ధంగా ఉంది")}
+                                  </span>
+                                ) : (
+                                  <span className="sample-status-pill load">
+                                    + {localize(lang, "Load & Analyse", "లోడ్ & విశ్లేషించు")}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 {liveCameraOpen && (
@@ -1498,14 +1826,82 @@ function PatientDetail({
                     )}
                   />
                 )}
-                <div className="photo-grid analysis-gallery">
-                  {images.map((image) => (
-                    <OralAnalysis
-                      key={image.id}
-                      image={image}
-                      consent={photoConsent}
-                    />
-                  ))}
+                {images.length > 0 && (
+                  <div className="subsite-pill-bar">
+                    <button
+                      type="button"
+                      className={`subsite-pill ${selectedSubsiteFilter === "all" ? "active" : ""}`}
+                      onClick={() => setSelectedSubsiteFilter("all")}
+                    >
+                      {localize(lang, "All Sub-sites", "అన్ని భాగాలు")} ({images.length})
+                    </button>
+                    {ANATOMICAL_SUB_SITES.map((site) => {
+                      const count = images.filter((img) => matchesSubsite(img, site.id)).length;
+                      return (
+                        <button
+                          key={site.id}
+                          type="button"
+                          className={`subsite-pill ${selectedSubsiteFilter === site.id ? "active" : ""}`}
+                          onClick={() => {
+                            setSelectedSubsiteFilter(site.id);
+                            setOralView(site.id);
+                          }}
+                        >
+                          <span>{site.en}</span>
+                          <span className={`subsite-count-badge ${count > 0 ? "count-active" : ""}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div ref={galleryRef} className="photo-grid analysis-gallery">
+                  {images.filter((img) => matchesSubsite(img, selectedSubsiteFilter)).length === 0 ? (
+                    <div className="empty-subsite-placeholder">
+                      <Sparkles size={24} style={{ color: "#2563eb", marginBottom: "6px" }} />
+                      <p>
+                        {localize(
+                          lang,
+                          `No photograph attached yet for ${ANATOMICAL_SUB_SITES.find((s) => s.id === selectedSubsiteFilter)?.en || "this sub-site"}.`,
+                          `${ANATOMICAL_SUB_SITES.find((s) => s.id === selectedSubsiteFilter)?.te || "ఈ భాగానికి"} ఇంకా చిత్రం లేదు.`,
+                        )}
+                      </p>
+                      <div className="empty-subsite-actions">
+                        <button
+                          type="button"
+                          className="button primary small"
+                          onClick={() => void loadSample(selectedSubsiteFilter)}
+                          disabled={imageBusy || w.busy}
+                        >
+                          <Sparkles size={14} />
+                          {localize(lang, "Load Reference Photo & Analyse", "నమూనా లోడ్ చేసి విశ్లేషించండి")}
+                        </button>
+                        <button
+                          type="button"
+                          className="button small"
+                          onClick={() => {
+                            setOralView(selectedSubsiteFilter);
+                            setLiveCameraOpen(true);
+                          }}
+                          disabled={imageBusy || w.busy}
+                        >
+                          <Camera size={14} />
+                          {localize(lang, "Take Live Photo", "లైవ్ ఫోటో తీయండి")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    images
+                      .filter((img) => matchesSubsite(img, selectedSubsiteFilter))
+                      .map((image) => (
+                        <OralAnalysis
+                          key={image.id}
+                          image={image}
+                          consent={photoConsent}
+                        />
+                      ))
+                  )}
                 </div>
                 {isCloud && !w.services.ai && (
                   <p className="form-notice">
@@ -1584,6 +1980,40 @@ function PatientDetail({
                     <dt>{t("language")}</dt>
                     <dd>{languageName(patient.preferred_language)}</dd>
                   </div>
+                  {patient.mandal && (
+                    <div>
+                      <dt>{localize(lang, "ASR Mandal", "మండలం")}</dt>
+                      <dd>{patient.mandal}</dd>
+                    </div>
+                  )}
+                  {patient.habitation && (
+                    <div>
+                      <dt>{localize(lang, "Habitation", "నివాసం")}</dt>
+                      <dd>{patient.habitation}</dd>
+                    </div>
+                  )}
+                  {patient.subcenter && (
+                    <div>
+                      <dt>{localize(lang, "Sub-centre", "ఉప కేంద్రం")}</dt>
+                      <dd>{patient.subcenter}</dd>
+                    </div>
+                  )}
+                  {patient.abha_id && (
+                    <div>
+                      <dt>{localize(lang, "ABHA ID", "ABHA ఐడీ")}</dt>
+                      <dd>
+                        <span className="badge badge-completed">
+                          {patient.abha_id}
+                        </span>
+                      </dd>
+                    </div>
+                  )}
+                  {patient.aadhaar_last4 && (
+                    <div>
+                      <dt>{localize(lang, "Aadhaar", "ఆధార్")}</dt>
+                      <dd>•••• •••• {patient.aadhaar_last4}</dd>
+                    </div>
+                  )}
                 </dl>
                 {screening && (
                   <IntakeFacts

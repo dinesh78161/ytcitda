@@ -22,3 +22,4 @@ ml/artifacts/
 __pycache__/
 *.pyc
 .language-work/
+Screenshot*.png

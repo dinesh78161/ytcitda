@@ -267,7 +267,12 @@ export function useWorkspace() {
           throw new Error(
             "Reconnect before changing clinical records. Registration drafts can be saved offline.",
           );
-        if (isCloud && action === "image")
+        if (isCloud && action === "delete_image")
+          await careApi("delete", {
+            kind: "oral",
+            id: payload.image_id ?? payload.id,
+          });
+        else if (isCloud && action === "image")
           await careApi("upload", {
             kind: "oral",
             data_url: payload.preview,

@@ -26,6 +26,11 @@ export interface Patient {
   display_name: string;
   age_years: number;
   village: string;
+  mandal?: string | null;
+  habitation?: string | null;
+  subcenter?: string | null;
+  abha_id?: string | null;
+  aadhaar_last4?: string | null;
   contact_phone?: string | null;
   preferred_language: Language;
   facility_id: string;
@@ -249,6 +254,7 @@ export interface Command {
     | "diagnosis"
     | "followup"
     | "image"
+    | "delete_image"
     | "analyze"
     | "reschedule"
     | "treatment"

@@ -1,12 +1,25 @@
 import { localize } from "./localize.ts";
 import type { Language, Role } from "./types";
+export const ANATOMICAL_SUB_SITES = [
+  { id: "left_buccal_mucosa", en: "Left Buccal Mucosa", te: "ఎడమ చెంప లోపల", full: "Left Buccal Mucosa (ఎడమ చెంప లోపల)" },
+  { id: "right_buccal_mucosa", en: "Right Buccal Mucosa", te: "కుడి చెంప లోపల", full: "Right Buccal Mucosa (కుడి చెంప లోపల)" },
+  { id: "lateral_tongue", en: "Lateral Border of Tongue", te: "నాలుక అంచు", full: "Lateral Border of Tongue (నాలుక అంచు)" },
+  { id: "floor_of_mouth", en: "Floor of Mouth", te: "నాలుక క్రింది భాగం", full: "Floor of Mouth (నాలుక క్రింది భాగం)" },
+  { id: "palate", en: "Hard / Soft Palate", te: "అంగిలి", full: "Hard / Soft Palate (అంగిలి)" },
+  { id: "lower_labial_sulcus", en: "Lower Labial Sulcus", te: "పెదవి లోపల", full: "Lower Labial Sulcus (పెదవి లోపల)" },
+] as const;
+
 export function oralViewLabel(value: string, language: Language) {
   const views: Record<string, [string, string]> = {
-    cheek: ["Cheek", "చెంప"],
+    left_buccal_mucosa: ["Left Buccal Mucosa (ఎడమ చెంప లోపల)", "ఎడమ చెంప లోపల (Left Buccal Mucosa)"],
+    right_buccal_mucosa: ["Right Buccal Mucosa (కుడి చెంప లోపల)", "కుడి చెంప లోపల (Right Buccal Mucosa)"],
+    lateral_tongue: ["Lateral Border of Tongue (నాలుక అంచు)", "నాలుక అంచు (Lateral Border of Tongue)"],
+    floor_of_mouth: ["Floor of Mouth (నాలుక క్రింది భాగం)", "నాలుక క్రింది భాగం (Floor of Mouth)"],
+    palate: ["Hard / Soft Palate (అంగిలి)", "అంగిలి (Hard / Soft Palate)"],
+    lower_labial_sulcus: ["Lower Labial Sulcus (పెదవి లోపల)", "పెదవి లోపల (Lower Labial Sulcus)"],
+    cheek: ["Cheek (Buccal Mucosa)", "చెంప లోపల"],
     tongue: ["Tongue", "నాలుక"],
-    palate: ["Palate", "అంగిలి"],
     gums: ["Gums", "చిగుళ్లు"],
-    floor_of_mouth: ["Floor of mouth", "నోటి అడుగు భాగం"],
   };
   return views[value]
     ? localize(language, ...views[value])

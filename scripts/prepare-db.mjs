@@ -12,6 +12,8 @@ const sources = [
   "supabase/migrations/202610290008_image_findings.sql",
   "supabase/migrations/202610290009_languages.sql",
   "supabase/migrations/202610300010_clinical_workspace.sql",
+  "supabase/migrations/202610300011_patient_abdm_identifiers.sql",
+  "supabase/migrations/202610300012_anatomical_subsites.sql",
   "supabase/seed.sql",
 ];
 const sections = [];

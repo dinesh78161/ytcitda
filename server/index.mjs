@@ -209,9 +209,17 @@ export function createServices(
       );
       if (oral)
         requireValue(
-          ["cheek", "tongue", "palate", "gums", "floor_of_mouth"].includes(
-            body.oral_view || "cheek",
-          ),
+          [
+            "cheek",
+            "tongue",
+            "palate",
+            "gums",
+            "floor_of_mouth",
+            "left_buccal_mucosa",
+            "right_buccal_mucosa",
+            "lateral_tongue",
+            "lower_labial_sulcus",
+          ].includes(body.oral_view || "cheek"),
           400,
           "Invalid oral view.",
         );
@@ -231,7 +239,10 @@ export function createServices(
         investigation_id: body.investigation_id || null,
         oral_view: body.oral_view || "cheek",
         quality_status: file.quality_status,
-        quality_details: file.quality_details,
+        quality_details: {
+          ...file.quality_details,
+          subsite: body.oral_view || "cheek",
+        },
       };
       return storePrivateUpload(
         admin,
@@ -273,6 +284,38 @@ export function createServices(
           }),
       );
       return { url: signed.signedUrl, expires_in: 60 };
+    }
+    if (path === "/api/delete") {
+      const oral = body.kind === "oral";
+      requireValue(oral || body.kind === "report", 400, "Invalid file kind.");
+      role(
+        ctx,
+        oral
+          ? ["health_worker", "medical_officer", "specialist"]
+          : ["medical_officer", "specialist"],
+      );
+      requireValue(uuid(body.id), 400, "Invalid file ID.");
+      const table = oral ? "images" : "patient_documents";
+      const { data, error } = await ctx.user
+        .from(table)
+        .select("*")
+        .eq("id", body.id)
+        .maybeSingle();
+      requireValue(!error && data, 404, "File was not found.");
+      await patient(ctx, data.patient_id);
+      if (oral) {
+        await admin.from("ai_analyses").delete().eq("image_id", data.id);
+        if (data.object_key) {
+          await admin.storage.from("oral-images").remove([data.object_key]);
+        }
+      } else {
+        if (data.object_key) {
+          await admin.storage.from("pathology-reports").remove([data.object_key]);
+        }
+      }
+      await admin.from(table).delete().eq("id", data.id);
+      await audit(ctx, "DELETE", table, data.id);
+      return { success: true, id: data.id };
     }
     if (path === "/api/video") {
       requireValue(status().video, 503, "Video provider is not configured.");
@@ -621,9 +664,13 @@ export function createApi(services, env = process.env, { staticDir } = {}) {
       }
       requireValue(req.method === "POST", 405, "Use POST.");
       requireValue(
-        ["/api/upload", "/api/download", "/api/video", "/api/analyze"].includes(
-          req.url,
-        ),
+        [
+          "/api/upload",
+          "/api/download",
+          "/api/delete",
+          "/api/video",
+          "/api/analyze",
+        ].includes(req.url),
         404,
         "Endpoint not found.",
       );
