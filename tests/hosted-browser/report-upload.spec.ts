@@ -323,7 +323,7 @@ test("a recovered connection does not enable reports after consent withdrawal", 
 }) => {
   const state = await fixture(page, baseURL!, { consent: false });
   state.enable();
-  await page.getByLabel("Workspace settings", { exact: true }).click();
+  await page.getByLabel("Settings", { exact: true }).click();
   await page
     .getByRole("button", { name: "Check connections", exact: true })
     .click();

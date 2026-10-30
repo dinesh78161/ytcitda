@@ -74,7 +74,7 @@ npm run preview
 ```
 
 Open http://127.0.0.1:4173. The local synthetic demo has role selection and browser
-persistence. In Workspace settings use Reset demo to restore its seed. This resets
+persistence. In Settings use Reset demo to restore its seed. This resets
 only browser demo state, not hosted Supabase. Offline behavior works after one online
 load. If `.env` selects Supabase for development, explicitly set demo mode in the
 terminal used to build. Restore the production build with `npm run build:render`.

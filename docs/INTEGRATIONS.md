@@ -18,7 +18,7 @@ For hosting, deploy the static build and Node API behind the same HTTPS origin, 
 1. Follow [Supabase setup](SUPABASE_SETUP.md), including migrations **202610270004_care_workflows.sql** and **202610280005_patient_journey.sql**. Existing projects apply only unapplied migrations; never re-run the first schema migration.
 2. Copy `.env.example` to `.env`, set `VITE_APP_MODE=supabase`, project URL and publishable key.
 3. Copy `.env.server.example` to `.env.server`. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and a server-only `SUPABASE_SECRET_KEY` with service-role privileges. No secret may have a `VITE_` prefix.
-4. Restart both servers, sign in as provisioned staff, then use Workspace settings → Check connections. “Configured” reports the presence of configuration; it does not prove credentials or the hosted services are healthy.
+4. Restart both servers, sign in as provisioned staff, then use Settings → Check connections. “Configured” reports the presence of configuration; it does not prove credentials or the hosted services are healthy.
 
 The API verifies the access token with Supabase Auth, checks active staff role and patient assignment, and requires the latest consent. Files remain in private buckets. Images are decoded, bounded to 4 megapixels, re-encoded without source metadata, hashed and quality-checked on the server. The browser normalizes larger supported images to JPEG before sending them. The quality check is a prototype; it is not a calibrated medical quality assessment.
 
@@ -50,7 +50,7 @@ LIVEKIT_API_KEY=YOUR_API_KEY
 LIVEKIT_API_SECRET=YOUR_API_SECRET
 ```
 
-Save/redeploy Render, then check Workspace settings for configured video. The API
+Save/redeploy Render, then check Settings for configured video. The API
 verifies the user's role, patient assignment, current teleconsultation consent and
 appointment join window before signing a token. Tokens allow only camera and microphone
 publishing and subscription in that one room. They grant no recording, data publishing,

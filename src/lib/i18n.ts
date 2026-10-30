@@ -23,7 +23,7 @@ export const labels = {
   appointments: ["Appointments", "అపాయింట్‌మెంట్‌లు"],
   followups: ["Care navigation", "సంరక్షణ సమన్వయం"],
   reports: ["District reports", "జిల్లా నివేదికలు"],
-  settings: ["Workspace settings", "వర్క్‌స్పేస్ సెట్టింగ్‌లు"],
+  settings: ["Settings", "సెట్టింగ్‌లు"],
   workspace: ["CARE WORKSPACE", "సంరక్షణ కేంద్రం"],
   programme: ["AAROHAN 2026 · ITDA PADERU", "ఆరోహణ్ 2026 · ఐటీడీఏ పాడేరు"],
   tagline: ["Community care, connected.", "సమాజ ఆరోగ్యానికి అనుసంధానం."],

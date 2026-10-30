@@ -155,7 +155,7 @@ test("clinical pages use signed-in roles and show actual clinician-led workflows
     ).toHaveCount(0);
   }
   await page
-    .getByRole("button", { name: "Workspace settings", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
     .first()
     .click();
   await expect(
