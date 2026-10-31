@@ -36,7 +36,9 @@ import {
   LoaderCircle,
   LogOut,
   MapPin,
+  Maximize2,
   Menu,
+  Minimize2,
   Plus,
   RefreshCw,
   Search,
@@ -1081,15 +1083,19 @@ export function Modal({
   title,
   children,
   onClose,
+  allowMaximize = false,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  allowMaximize?: boolean;
+  className?: string;
 }) {
-  const { lang } = useApp();
+  const { lang, t } = useApp();
+  const [maximized, setMaximized] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
 
-  const ref = useRef<HTMLDialogElement>(null),
-    { t } = useApp();
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
@@ -1098,7 +1104,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={`modal ${maximized ? "modal-maximized" : ""} ${className}`.trim()}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -1111,13 +1117,31 @@ export function Modal({
           </span>
           <h2>{title}</h2>
         </div>
-        <button
-          className="icon-button"
-          onClick={onClose}
-          aria-label={t("close")}
-        >
-          <X />
-        </button>
+        <div className="modal-heading-controls">
+          {allowMaximize && (
+            <button
+              type="button"
+              className="icon-button modal-maximize-btn"
+              onClick={() => setMaximized((v) => !v)}
+              title={
+                maximized
+                  ? localize(lang, "Restore standard size", "సాధారణ పరిమాణానికి మార్చు")
+                  : localize(lang, "Maximize screen", "పూర్తి స్క్రీన్‌కు మార్చు")
+              }
+              aria-label={maximized ? "Restore view" : "Maximize view"}
+            >
+              {maximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label={t("close")}
+          >
+            <X />
+          </button>
+        </div>
       </div>
       {children}
     </dialog>

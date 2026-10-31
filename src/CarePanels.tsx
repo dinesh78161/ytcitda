@@ -718,8 +718,10 @@ export function AppointmentTools({
       )}
       {video && (
         <Modal
-          title={l("Private consultation", "వ్యక్తిగత సంప్రదింపు")}
+          title={l("Private clinical consultation", "వ్యక్తిగత క్లినికల్ సంప్రదింపు")}
           onClose={() => setVideo(null)}
+          allowMaximize={true}
+          className="consultation-modal"
         >
           {video.provider === "livekit" ? (
             <Suspense
@@ -729,6 +731,9 @@ export function AppointmentTools({
                 access={video}
                 appointmentId={a.id}
                 lang={lang}
+                userRole={w.profile?.role}
+                userName={w.profile?.display_name}
+                patientName={w.data.patients.find((p) => p.id === a.patient_id)?.display_name}
               />
             </Suspense>
           ) : (

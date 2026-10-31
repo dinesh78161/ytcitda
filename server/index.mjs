@@ -343,12 +343,21 @@ export function createServices(
           503,
           "Configure a secure LiveKit wss:// project URL.",
         );
+        const roleLabel =
+          ctx.profile.role === "specialist"
+            ? "Specialist Doctor"
+            : ctx.profile.role === "medical_officer"
+            ? "Medical Officer (Doctor)"
+            : "Community Health Worker";
+        const participantName = ctx.profile.display_name
+          ? `${ctx.profile.display_name} (${roleLabel})`
+          : roleLabel;
         const token = new AccessToken(
           env.LIVEKIT_API_KEY,
           env.LIVEKIT_API_SECRET,
           {
             identity: ctx.profile.id,
-            name: `Synthetic ${ctx.profile.role.replaceAll("_", " ")}`,
+            name: participantName,
             ttl: Math.max(1, exp - Math.floor(Date.now() / 1000)),
           },
         );
@@ -417,6 +426,15 @@ export function createServices(
         502,
         "Provider returned an invalid room.",
       );
+      const dailyRoleLabel =
+        ctx.profile.role === "specialist"
+          ? "Specialist Doctor"
+          : ctx.profile.role === "medical_officer"
+          ? "Medical Officer (Doctor)"
+          : "Community Health Worker";
+      const dailyParticipantName = ctx.profile.display_name
+        ? `${ctx.profile.display_name} (${dailyRoleLabel})`
+        : dailyRoleLabel;
       const token = await remote(
         "https://api.daily.co/v1/meeting-tokens",
         env.DAILY_API_KEY,
@@ -427,7 +445,7 @@ export function createServices(
             eject_at_token_exp: true,
             is_owner: false,
             user_id: ctx.profile.id,
-            user_name: ctx.profile.display_name,
+            user_name: dailyParticipantName,
             enable_recording_ui: false,
             start_cloud_recording: false,
             auto_start_transcription: false,
