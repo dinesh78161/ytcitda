@@ -1,0 +1,640 @@
+/* Phone layouts for field screening. Desktop rules remain in styles.css. */
+.mobile-worker-nav,
+.mobile-page-title,
+.mobile-nav-close,
+.mobile-nav-speech,
+.mobile-cell-label {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html {
+    scroll-padding-top: 80px;
+    scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    height: auto;
+    min-height: 64px;
+    padding: env(safe-area-inset-top) 12px 0;
+    gap: 8px;
+  }
+
+  .topbar-left {
+    flex: 1;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .topbar-right {
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .mobile-page-title {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .topbar .workspace-mode,
+  .topbar [data-greeting] {
+    display: none;
+  }
+
+  .topbar .language-picker {
+    max-width: 126px;
+  }
+
+  .topbar .language-picker select {
+    width: 92px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .topbar .language-picker > svg {
+    display: none;
+  }
+
+  .user-button,
+  .icon-button,
+  .icon-button-close {
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .sidebar {
+    width: min(300px, 86vw);
+    height: 100dvh;
+    padding: calc(20px + env(safe-area-inset-top)) 16px
+      calc(20px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+
+  .sidebar .brand img {
+    width: 100px;
+    height: 100px;
+  }
+
+  .sidebar-rule {
+    margin: 18px 10px;
+  }
+
+  .mobile-nav-close {
+    display: inline-flex;
+    align-self: flex-end;
+    color: #fff;
+  }
+
+  .mobile-nav-speech {
+    display: flex;
+    margin-top: 8px;
+  }
+
+  .sidebar .nav-item {
+    min-height: 52px;
+    font-size: 15px;
+  }
+
+  .sidebar-bottom {
+    padding-top: 24px;
+  }
+
+  .worker-shell main {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-worker-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: fixed;
+    z-index: 30;
+    inset: auto 0 0;
+    padding: 8px max(8px, env(safe-area-inset-right))
+      calc(8px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    gap: 4px;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px #123f390a;
+  }
+
+  .mobile-worker-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 58px;
+    padding: 6px 3px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #61756c;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-worker-nav button.active {
+    background: #edf6f1;
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  .mobile-worker-nav .mobile-register {
+    background: var(--green);
+    color: white;
+    font-weight: 650;
+  }
+
+  .app-shell:has(.sidebar.is-open) .mobile-worker-nav {
+    visibility: hidden;
+  }
+
+  main {
+    padding: 16px 14px 0;
+  }
+
+  .button,
+  .text-button,
+  .back-link,
+  .subsite-pill,
+  .button-pill {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .button svg,
+  .form-notice svg,
+  .error-box svg {
+    flex-shrink: 0;
+  }
+
+  .page-heading .button {
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  .page-heading p,
+  .hero p,
+  .worker-shortcut small,
+  .metric-help,
+  .detail-card > p,
+  .form-notice,
+  .field,
+  .check-field {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .worker-hero-actions .button {
+    min-height: 52px;
+    font-size: 15px;
+  }
+
+  .worker-shell .page-heading > .button,
+  .worker-hero .journey-steps {
+    display: none;
+  }
+
+  .worker-shortcuts {
+    gap: 10px;
+  }
+
+  .worker-shortcut {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .metric-card {
+    padding: 16px 12px;
+  }
+
+  .metric-top {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .table-toolbar {
+    padding: 14px;
+  }
+
+  .table-toolbar .search-field,
+  .table-toolbar select {
+    width: 100%;
+    max-width: 100%;
+    min-height: 48px;
+  }
+
+  .search-field input,
+  .table-toolbar select,
+  .field input,
+  .field select,
+  .field textarea {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .patient-table {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .patient-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .patient-table tbody {
+    display: grid;
+    padding: 0 12px 12px;
+    gap: 10px;
+  }
+
+  .patient-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "identity open" "village village" "stage stage" "date date";
+    gap: 8px 6px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .patient-table td {
+    padding: 0;
+    min-width: 0;
+    border: 0;
+    white-space: normal;
+    font-size: 13px;
+  }
+
+  .patient-identity-cell {
+    grid-area: identity;
+  }
+  .patient-village-cell {
+    grid-area: village;
+  }
+  .patient-stage-cell {
+    grid-area: stage;
+  }
+  .patient-date-cell {
+    grid-area: date;
+  }
+  .patient-open-cell {
+    grid-area: open;
+  }
+
+  .patient-table .patient-link {
+    min-height: 48px;
+    width: 100%;
+    text-align: left;
+  }
+
+  .patient-link > span:last-child {
+    min-width: 0;
+  }
+
+  .patient-table .patient-link strong {
+    font-size: 15px;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .patient-table .patient-link small,
+  .patient-table .village-cell,
+  .patient-table .badge {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .patient-table .patient-open-cell .icon-button {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--green);
+  }
+
+  .mobile-cell-label {
+    display: inline;
+    margin-right: 8px;
+    color: var(--muted);
+  }
+
+  .patient-journey {
+    padding: 16px;
+  }
+
+  .journey-heading h2 {
+    font-size: 18px;
+  }
+
+  .journey-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 10px;
+    scroll-snap-type: x proximity;
+  }
+
+  .journey-grid li {
+    flex: 0 0 142px;
+    scroll-snap-align: start;
+  }
+
+  .journey-step {
+    min-height: 124px;
+    padding: 12px;
+  }
+
+  .journey-step strong {
+    font-size: 13px;
+  }
+
+  .journey-state {
+    font-size: 12px;
+  }
+
+  .journey-next .button {
+    width: 100%;
+    white-space: normal;
+    text-align: left;
+    justify-content: space-between;
+  }
+
+  .detail-layout,
+  .detail-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+    padding: 0 14px;
+  }
+
+  .tabs button {
+    min-height: 48px;
+    padding: 12px 0;
+    font-size: 13px;
+    white-space: normal;
+  }
+
+  .clinical-facts > div,
+  .intake-summary > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .clinical-facts dt,
+  .intake-summary dt {
+    font-size: 12px;
+  }
+
+  .clinical-facts dd,
+  .intake-summary dd {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .subsite-pill-bar {
+    gap: 8px;
+  }
+
+  .subsite-pill {
+    white-space: normal;
+    max-width: 100%;
+  }
+
+  .analysis-image-actions {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .analysis-image-actions > small {
+    flex-basis: 100%;
+    font-size: 12px;
+  }
+
+  .analysis-image-actions > div {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .analysis-findings-scroll-container {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .analysis-run,
+  .capture-method-card,
+  .capture-method-upload {
+    min-height: 52px;
+    font-size: 15px;
+    white-space: normal;
+  }
+
+  .analysis-result-box p,
+  .vision-report li,
+  .vision-report .vision-summary,
+  .vision-report h5 {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .toast {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    width: calc(100% - 28px);
+    padding: 12px 10px 12px 14px;
+    font-size: 14px;
+  }
+
+  body:has(.worker-shell) .toast {
+    bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+
+  .modal:has(.guided-intake) {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    overscroll-behavior: contain;
+  }
+
+  .modal:has(.guided-intake) .modal-heading {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    background: #fff;
+  }
+
+  .guided-intake.registration-form {
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px 0;
+    min-height: calc(100dvh - 90px);
+  }
+
+  .guided-intake .intake-step {
+    flex: 1;
+  }
+
+  .guided-intake .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .guided-intake .field input,
+  .guided-intake .field select {
+    min-height: 48px;
+  }
+
+  .guided-intake .check-field {
+    align-items: flex-start;
+  }
+
+  .guided-intake .check-field input,
+  .intake-option input {
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+
+  .intake-option {
+    min-height: 56px;
+    font-size: 14px;
+  }
+
+  .intake-progress {
+    margin-bottom: 18px;
+  }
+
+  .intake-progress button {
+    font-size: 12px;
+  }
+
+  .guided-intake .intake-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    margin: 20px -16px 0;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+    gap: 8px;
+    background: #fff;
+    box-shadow: 0 -4px 16px #123f390a;
+  }
+
+  .intake-footer > span {
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .guided-intake .intake-footer .button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 48px;
+    padding: 10px 8px;
+    font-size: 14px;
+    white-space: normal;
+  }
+
+  .live-camera-backdrop {
+    padding: 0;
+  }
+
+  body:has(.live-camera-backdrop) {
+    overflow: hidden;
+  }
+
+  .live-camera-modal {
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .live-camera-header {
+    padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .live-camera-title-row h3 {
+    font-size: 16px;
+  }
+
+  .live-camera-body {
+    flex: 1;
+    min-height: 0;
+    padding: 12px;
+    overscroll-behavior: contain;
+  }
+
+  .live-camera-footer {
+    flex-shrink: 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .live-camera-stream-actions,
+  .live-camera-review-actions,
+  .live-camera-error-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .live-camera-review-actions .button,
+  .live-camera-error-actions .button {
+    flex: 1 1 130px;
+    white-space: normal;
+  }
+
+  .camera-device-select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .clinical-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 500px) {
+  .live-camera-stream-wrapper {
+    aspect-ratio: 16 / 9;
+    max-height: 45dvh;
+  }
+
+  .intake-progress button {
+    flex-direction: row;
+    padding: 7px;
+  }
+}

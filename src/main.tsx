@@ -18,6 +18,7 @@ import "@fontsource/noto-sans-bengali/600.css";
 import "@fontsource/noto-sans-oriya/400.css";
 import "@fontsource/noto-sans-oriya/600.css";
 import "./styles.css";
+import "./mobile.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

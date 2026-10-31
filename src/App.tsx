@@ -138,6 +138,11 @@ export default function App() {
     [registration, setRegistration] = useState(false),
     [mobileNav, setMobileNav] = useState(false),
     [toast, setToast] = useState<{ text: string; error: boolean } | null>(null);
+  const [mobile, setMobile] = useState(
+    () => window.matchMedia("(max-width: 760px)").matches,
+  );
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
   const t = translator(lang, isClinical);
   const notify = (text: string, error = false) =>
     setToast({ text: localize(lang, text), error });
@@ -159,6 +164,9 @@ export default function App() {
     localStorage.setItem("aarogya-language", lang);
   }, [lang]);
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page, selected]);
+  useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 6500);
       return () => clearTimeout(timer);
@@ -168,7 +176,54 @@ export default function App() {
     setSelected(null);
     setPage("overview");
     setSearch("");
+    setMobileNav(false);
   }, [w.profile?.id]);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    const update = () => {
+      setMobile(query.matches);
+      if (!query.matches) setMobileNav(false);
+    };
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!mobile || !mobileNav) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const drawer = sidebarRef.current;
+    const focusable = () =>
+      Array.from(
+        drawer?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], select:not(:disabled)',
+        ) ?? [],
+      );
+    drawer?.querySelector<HTMLButtonElement>(".mobile-nav-close")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileNav(false);
+      }
+      if (event.key === "Tab") {
+        const items = focusable();
+        const first = items[0];
+        const last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      menuRef.current?.focus();
+    };
+  }, [mobile, mobileNav]);
   const navigate = (next: Page) => {
     setSelected(null);
     setPage(next);
@@ -192,7 +247,9 @@ export default function App() {
       ) : w.mfaRequired ? (
         <MfaGate lang={lang} onVerified={w.completeMfa} onSignOut={w.signOut} />
       ) : (
-        <div className="app-shell">
+        <div
+          className={`app-shell ${w.profile.role === "health_worker" ? "worker-shell" : ""}`}
+        >
           {mobileNav && (
             <button
               className="nav-scrim"
@@ -200,7 +257,23 @@ export default function App() {
               onClick={() => setMobileNav(false)}
             />
           )}
-          <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
+          <aside
+            ref={sidebarRef}
+            id="workspace-navigation"
+            className={`sidebar ${mobileNav ? "is-open" : ""}`}
+            inert={mobile && !mobileNav}
+            aria-hidden={mobile && !mobileNav ? true : undefined}
+            role={mobile && mobileNav ? "dialog" : undefined}
+            aria-modal={mobile && mobileNav ? true : undefined}
+            aria-label={t("workspace")}
+          >
+            <button
+              className="icon-button mobile-nav-close"
+              aria-label={t("close")}
+              onClick={() => setMobileNav(false)}
+            >
+              <X size={22} />
+            </button>
             <a
               className="brand"
               href="#"
@@ -224,6 +297,7 @@ export default function App() {
                 <button
                   key={id}
                   className={`nav-item ${page === id && !selected ? "active" : ""}`}
+                  aria-current={page === id && !selected ? "page" : undefined}
                   onClick={() => navigate(id)}
                 >
                   <Icon size={19} />
@@ -243,6 +317,14 @@ export default function App() {
                 </button>
               ))}
             </nav>
+            <button
+              className="nav-item mobile-nav-speech"
+              onClick={greeting.play}
+              disabled={w.loading}
+            >
+              <Volume2 size={19} />
+              {greetings[lang].playLabel}
+            </button>
             <div className="sidebar-bottom">
               <button
                 className={`nav-item ${page === "settings" ? "active" : ""}`}
@@ -266,11 +348,17 @@ export default function App() {
               <div className="topbar-left">
                 <button
                   className="icon-button mobile-menu"
+                  ref={menuRef}
                   aria-label={t("menu")}
+                  aria-expanded={mobileNav}
+                  aria-controls="workspace-navigation"
                   onClick={() => setMobileNav(true)}
                 >
                   <Menu size={22} />
                 </button>
+                <span className="mobile-page-title">
+                  {selected ? t("patientRecord") : pageLabel(page)}
+                </span>
                 <span className="breadcrumb">
                   {t("workspace")}
                   <ChevronRight size={14} />
@@ -285,6 +373,8 @@ export default function App() {
               <div className="topbar-right">
                 <span
                   className={`connection-pill ${!w.online ? "offline" : ""}`}
+                  role="status"
+                  aria-label={w.online ? t("online") : t("offline")}
                 >
                   {w.online ? (
                     <span className="status-dot" />
@@ -297,6 +387,7 @@ export default function App() {
                 <button
                   className="icon-button"
                   aria-label={greetings[lang].playLabel}
+                  data-greeting
                   title={`${greetings[lang].playLabel}: ${greetings[lang].text}`}
                   onClick={greeting.play}
                   disabled={w.loading}
@@ -468,6 +559,34 @@ export default function App() {
                 </span>
               </footer>
             </main>
+            {w.profile.role === "health_worker" && (
+              <nav className="mobile-worker-nav" aria-label={t("workspace")}>
+                {(
+                  [
+                    ["overview", LayoutDashboard],
+                    ["patients", UsersRound],
+                    ["appointments", CalendarDays],
+                  ] as const
+                ).map(([id, Icon]) => (
+                  <button
+                    key={id}
+                    className={page === id && !selected ? "active" : ""}
+                    aria-current={page === id && !selected ? "page" : undefined}
+                    onClick={() => navigate(id)}
+                  >
+                    <Icon size={21} />
+                    <span>{t(id)}</span>
+                  </button>
+                ))}
+                <button
+                  className="mobile-register"
+                  onClick={() => setRegistration(true)}
+                >
+                  <Plus size={21} />
+                  <span>{t("newPatient")}</span>
+                </button>
+              </nav>
+            )}
           </div>
         </div>
       )}
@@ -995,7 +1114,7 @@ function PatientTable({
         </div>
       )}
       <div className="table-scroll">
-        <table>
+        <table className="patient-table">
           <thead>
             <tr>
               <th>{t("patient")}</th>
@@ -1018,7 +1137,7 @@ function PatientTable({
               const s = latestScreening(w.data, p.id);
               return (
                 <tr key={p.id}>
-                  <td>
+                  <td className="patient-identity-cell">
                     <button
                       className="patient-link"
                       onClick={() => onOpen(p.id)}
@@ -1039,13 +1158,13 @@ function PatientTable({
                       </span>
                     </button>
                   </td>
-                  <td>
+                  <td className="patient-village-cell">
                     <span className="village-cell">
                       <MapPin size={13} />
                       {p.village}
                     </span>
                   </td>
-                  <td>
+                  <td className="patient-stage-cell">
                     {s ? (
                       <Badge status={s.status} />
                     ) : (
@@ -1053,7 +1172,12 @@ function PatientTable({
                     )}
                   </td>
                   {(!compact || workerRecent) && (
-                    <td className="muted">
+                    <td className="muted patient-date-cell">
+                      <span className="mobile-cell-label">
+                        {workerRecent
+                          ? localize(lang, "Screened on", "పరీక్ష తేదీ")
+                          : t("registered")}
+                      </span>
                       {workerRecent
                         ? s
                           ? dateLabel(s.created_at, lang)
@@ -1061,7 +1185,7 @@ function PatientTable({
                         : dateLabel(p.created_at, lang)}
                     </td>
                   )}
-                  <td>
+                  <td className="patient-open-cell">
                     <button
                       className="icon-button"
                       aria-label={`${t("open")}: ${p.display_name}`}
@@ -1110,8 +1234,13 @@ export function Modal({
 
   useEffect(() => {
     const dialog = ref.current!;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     dialog.showModal();
-    return () => dialog.close();
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
   }, []);
   return (
     <dialog

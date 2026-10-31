@@ -276,6 +276,7 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                   <Field label={t("age")}>
                     <input
                       type="number"
+                      inputMode="numeric"
                       required
                       min="0"
                       max="120"
@@ -618,6 +619,7 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                       min="0"
                       max="100"
                       step="0.1"
+                      inputMode="decimal"
                       placeholder={copy("Not assessed", "పరిశీలించలేదు")}
                       value={String(form.mouth_opening_mm)}
                       onChange={(e) =>
