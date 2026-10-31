@@ -66,6 +66,26 @@ For hosted use, add the same three variables in the hosting service's server
 environment and redeploy after applying missing migrations. A local key does not
 configure the hosted site automatically.
 
+### Connection failures on the hosted app
+
+`/api/status` reports whether Gemini is configured, not whether a live inference
+request succeeds. A passing local `npm run ai:check` does not verify Render's
+credentials, selected model, quota or outbound network connection.
+
+The server retries a transient connection failure or HTTP 500/502/503/504 once,
+using the same model and image within the original 45-second total time limit.
+It does not retry quota, credential/model-access errors or invalid reports.
+An exhausted deadline returns a timeout message; a persistent connection failure
+returns a separate hosting-connection message. Neither saves an analysis result.
+
+If the hosted failure persists, check Render logs and Google's API status;
+verify `GEMINI_API_KEY` and `GEMINI_MODEL` in that service's environment. Where
+service shell access is available, run `npm run ai:check` there to test that
+deployment's configuration using a generated checkerboard without sending a
+patient photograph. Do not paste keys into logs or chat. A model change remains
+an explicit configuration choice; the app does not silently substitute another
+model.
+
 ## 4. Analyse a photograph
 
 Sign in to the Supabase workspace as an assigned health worker or clinician.

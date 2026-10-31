@@ -1,4 +1,6 @@
 {
+  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "ವಿಶ್ಲೇಷಣೆಯ ಸಮಯ ಮಿತಿಯೊಳಗೆ ಜೆಮಿನಿ ಪ್ರತಿಕ್ರಿಯಿಸಲಿಲ್ಲ. ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ; ಯಾವುದೇ ವಿಶ್ಲೇಷಣೆಯನ್ನು ಉಳಿಸಲಾಗಿಲ್ಲ.",
+  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "ಮರುಪ್ರಯತ್ನದ ನಂತರವೂ ಸರ್ವರ್ ಜೆಮಿನಿಗೆ ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. Google ಗೆ ಹೋಸ್ಟಿಂಗ್ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಲು ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ; ಯಾವುದೇ ವಿಶ್ಲೇಷಣೆಯನ್ನು ಉಳಿಸಲಾಗಿಲ್ಲ.",
   "Clinical reports": "ವೈದ್ಯಕೀಯ ವರದಿಗಳು",
   "Screening, referral and care summaries for records you can access.": "ನೀವು ಪ್ರವೇಶಿಸಬಹುದಾದ ದಾಖಲೆಗಳ ತಪಾಸಣೆ, ಉಲ್ಲೇಖ ಮತ್ತು ಆರೈಕೆಯ ಸಾರಾಂಶಗಳು.",
   "A clearer path to care.": "ಕಾಳಜಿಗೆ ಸ್ಪಷ್ಟವಾದ ದಾರಿ.",
@@ -423,7 +425,7 @@
   "Stopped": "ನಿಲ್ಲಿಸಲಾಗಿದೆ",
   "Supabase workspace": "ಸುಪೇಸ್ ವರ್ಕ್‌ಸ್ಪೇಸ್",
   "Supported conditions": "ಬೆಂಬಲಿತ ಪರಿಸ್ಥಿತಿಗಳು",
-  "Switch to a clinician account to record an independent review.": "ಸ್ವತಂತ್ರ ಪರಿಶೀಲನೆಯನ್ನು ದಾಖಲಿಸಲು ವೈದ್ಯರ ಖಾತೆಗೆ ಬದಲಿಸಿ.",
+  "Awaiting clinician review.": "ವೈದ್ಯರ ಪರಿಶೀಲನೆಗಾಗಿ ಕಾಯುತ್ತಿದೆ.",
   "Synthetic demo · Changes stay in this browser. Role switching is for demonstration only.": "ಸಿಂಥೆಟಿಕ್ ಡೆಮೋ · ಬದಲಾವಣೆಗಳು ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಉಳಿಯುತ್ತವೆ. ಪಾತ್ರ ಬದಲಾಯಿಸುವುದು ಪ್ರದರ್ಶನಕ್ಕಾಗಿ ಮಾತ್ರ.",
   "Synthetic demonstration · recording disabled": "ಸಿಂಥೆಟಿಕ್ ಪ್ರದರ್ಶನ · ರೆಕಾರ್ಡಿಂಗ್ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
   "Take oral photos": "ಬಾಯಿಯ ಫೋಟೋಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಿ",
@@ -791,5 +793,16 @@
   "Not enabled for clinical use": "ವೈದ್ಯಕೀಯ ಬಳಕೆಗಾಗಿ ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿಲ್ಲ",
   "Mock workflow test": "ಮಾಕ್ ವರ್ಕ್‌ಫ್ಲೋ ಪರೀಕ್ಷೆ",
   "Google Gemini · Research only": "Google Gemini · ಸಂಶೋಧನೆಗಾಗಿ ಮಾತ್ರ",
-  "Local image checks": "ಸ್ಥಳೀಯ ಚಿತ್ರ ತಪಾಸಣೆ"
+  "Local image checks": "ಸ್ಥಳೀಯ ಚಿತ್ರ ತಪಾಸಣೆ",
+  "Care workspace": "ಆರೈಕೆ ಕಾರ್ಯಸ್ಥಳ",
+  "Image quality checks assess exposure and sharpness, not disease.": "ಚಿತ್ರದ ಗುಣಮಟ್ಟದ ತಪಾಸಣೆಗಳು ಬೆಳಕು ಮತ್ತು ಸ್ಪಷ್ಟತೆಯನ್ನು ಅಳೆಯುತ್ತವೆ, ರೋಗವನ್ನಲ್ಲ.",
+  "Image analysis (optional)": "ಚಿತ್ರ ವಿಶ್ಲೇಷಣೆ (ಐಚ್ಛಿಕ)",
+  "Image analysis is unavailable. Continue with image quality checks and clinician review.": "ಚಿತ್ರ ವಿಶ್ಲೇಷಣೆ ಲಭ್ಯವಿಲ್ಲ. ಚಿತ್ರದ ಗುಣಮಟ್ಟದ ತಪಾಸಣೆ ಮತ್ತು ವೈದ್ಯರ ಪರಿಶೀಲನೆಯೊಂದಿಗೆ ಮುಂದುವರಿಯಿರಿ.",
+  "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.": "ಸ್ವಯಂಚಾಲಿತ ಜ್ಞಾಪನೆ ವಿತರಣೆ ಲಭ್ಯವಿಲ್ಲ. ಇಲ್ಲಿ ಜ್ಞಾಪನೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ರೋಗಿಗಳನ್ನು ನೇರವಾಗಿ ಸಂಪರ್ಕಿಸಿ.",
+  "Image observations": "ಚಿತ್ರದ ಅವಲೋಕನಗಳು",
+  "SIMULATED ANALYSIS": "ಅನುಕರಿಸಿದ ವಿಶ್ಲೇಷಣೆ",
+  "Analyse image": "ಚಿತ್ರವನ್ನು ವಿಶ್ಲೇಷಿಸಿ",
+  "For clinician review": "ವೈದ್ಯರ ಪರಿಶೀಲನೆಗಾಗಿ",
+  "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "ಉಳಿಸಿದ ನಂತರ ಬಾಯಿಯ ಫೋಟೋಗಳನ್ನು ಸೇರಿಸಲು ರೋಗಿಯ ದಾಖಲೆಯನ್ನು ತೆರೆಯಿರಿ. ಅಪ್‌ಲೋಡ್ ಮಾಡುವ ಮೊದಲು ಫೋಟೋ ಒಪ್ಪಿಗೆಯನ್ನು ದಾಖಲಿಸಿ.",
+  "File uploads are unavailable. Contact your workspace administrator.": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಲಭ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳ ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ."
 }

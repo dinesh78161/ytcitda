@@ -487,8 +487,8 @@ export function PatientCare({ patient }: { patient: Patient }) {
                           "ఫైల్ కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము. నివేదికలను అప్‌లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి.",
                         )
                       : l(
-                          "Private file storage is not configured. Contact the project administrator.",
-                          "ప్రైవేట్ ఫైల్ నిల్వ కాన్ఫిగర్ కాలేదు. ప్రాజెక్ట్ నిర్వాహకుడిని సంప్రదించండి.",
+                          "File uploads are unavailable. Contact your workspace administrator.",
+                          "ఫైళ్ల అప్‌లోడ్ అందుబాటులో లేదు. మీ కార్యస్థల నిర్వాహకుడిని సంప్రదించండి.",
                         )}
                 </p>
                 <button
@@ -785,8 +785,8 @@ export function RemindersPanel() {
               "ఆటోమేటిక్ పంపిణీ ప్రారంభమైంది. పంపబడింది అంటే సేవ అంగీకరించింది.",
             )
           : l(
-              "Reminders appear here automatically. External delivery is not configured.",
-              "రిమైండర్లు ఇక్కడ స్వయంచాలకంగా కనిపిస్తాయి. బాహ్య పంపిణీ అనుసంధానం కాలేదు.",
+              "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.",
+              "స్వయంచాలక రిమైండర్ పంపిణీ అందుబాటులో లేదు. ఇక్కడ రిమైండర్లను చూసి రోగులను నేరుగా సంప్రదించండి.",
             )}
       </p>
       {reminders.length === 0 && (

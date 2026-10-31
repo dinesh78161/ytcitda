@@ -1,4 +1,7 @@
 {
+  "Awaiting clinician review.": "వైద్యుని సమీక్ష కోసం వేచి ఉంది.",
+  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "విశ్లేషణ సమయ పరిమితిలో జెమినీ స్పందించలేదు. తర్వాత మళ్లీ ప్రయత్నించండి; విశ్లేషణ సేవ్ కాలేదు.",
+  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "మళ్లీ ప్రయత్నించినా సర్వర్ జెమినీకి కనెక్ట్ కాలేదు. Googleతో హోస్టింగ్ కనెక్షన్‌ను తనిఖీ చేయమని నిర్వాహకుడిని అడగండి; విశ్లేషణ సేవ్ కాలేదు.",
   "Clinical reports": "వైద్య నివేదికలు",
   "Screening, referral and care summaries for records you can access.": "మీరు చూడగల రికార్డుల పరీక్షలు, సిఫార్సులు మరియు సంరక్షణ సారాంశాలు.",
   "Clinical workspace": "క్లినికల్ వర్క్‌స్పేస్",
@@ -52,5 +55,16 @@
   "Not enabled for clinical use": "క్లినికల్ వినియోగం కోసం ప్రారంభించబడలేదు",
   "Mock workflow test": "మాక్ వర్క్‌ఫ్లో పరీక్ష",
   "Google Gemini · Research only": "Google జెమిని · పరిశోధన కోసం మాత్రమే",
-  "Local image checks": "స్థానిక చిత్ర తనిఖీలు"
+  "Local image checks": "స్థానిక చిత్ర తనిఖీలు",
+  "Care workspace": "సంరక్షణ కార్యస్థలం",
+  "Image quality checks assess exposure and sharpness, not disease.": "చిత్ర నాణ్యత తనిఖీలు కాంతి మరియు స్పష్టతను అంచనా వేస్తాయి, వ్యాధిని కాదు.",
+  "Image analysis (optional)": "చిత్ర విశ్లేషణ (ఐచ్ఛికం)",
+  "Image analysis is unavailable. Continue with image quality checks and clinician review.": "చిత్ర విశ్లేషణ అందుబాటులో లేదు. చిత్ర నాణ్యత తనిఖీలు మరియు వైద్య సమీక్షతో కొనసాగించండి.",
+  "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.": "స్వయంచాలక రిమైండర్ పంపిణీ అందుబాటులో లేదు. ఇక్కడ రిమైండర్లను చూసి రోగులను నేరుగా సంప్రదించండి.",
+  "Image observations": "చిత్ర పరిశీలనలు",
+  "SIMULATED ANALYSIS": "అనుకరణ విశ్లేషణ",
+  "Analyse image": "చిత్రాన్ని విశ్లేషించండి",
+  "For clinician review": "వైద్యుని సమీక్ష కోసం",
+  "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "సేవ్ చేసిన తర్వాత నోటి చిత్రాలను జోడించడానికి రోగి రికార్డు తెరవండి. అప్‌లోడ్ చేయడానికి ముందు చిత్ర సమ్మతి నమోదు చేయండి.",
+  "File uploads are unavailable. Contact your workspace administrator.": "ఫైళ్ల అప్‌లోడ్ అందుబాటులో లేదు. మీ కార్యస్థల నిర్వాహకుడిని సంప్రదించండి."
 }

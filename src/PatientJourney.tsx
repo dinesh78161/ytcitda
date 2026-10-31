@@ -20,7 +20,7 @@ const titles: Record<string, [string, string]> = {
   registration: ["Register patient", "రోగి నమోదు"],
   photos: ["Take oral photos", "నోటి చిత్రాలు"],
   quality: ["Image quality check", "చిత్ర నాణ్యత"],
-  analysis: ["Research AI (optional)", "పరిశోధన AI (ఐచ్ఛికం)"],
+  analysis: ["Image analysis (optional)", "చిత్ర విశ్లేషణ (ఐచ్ఛికం)"],
   review: ["Officer review / referral", "వైద్య సమీక్ష / సిఫార్సు"],
   consultation: ["Consultation", "సంప్రదింపు"],
   diagnostics: ["Biopsy / histopathology", "బయాప్సీ / పాథాలజీ"],

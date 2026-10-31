@@ -1,4 +1,6 @@
 {
+  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "பகுப்பாய்வு நேர வரம்பிற்குள் ஜெமினி பதிலளிக்கவில்லை. பிறகு மீண்டும் முயற்சிக்கவும்; பகுப்பாய்வு சேமிக்கப்படவில்லை.",
+  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "மீண்டும் முயன்றும் சேவையகத்தால் ஜெமினியுடன் இணைக்க முடியவில்லை. Google உடனான ஹோஸ்டிங் இணைப்பைச் சரிபார்க்க நிர்வாகியிடம் கேளுங்கள்; பகுப்பாய்வு சேமிக்கப்படவில்லை.",
   "Clinical reports": "மருத்துவ அறிக்கைகள்",
   "Screening, referral and care summaries for records you can access.": "நீங்கள் அணுகக்கூடிய பதிவுகளின் பரிசோதனை, பரிந்துரை மற்றும் பராமரிப்பு சுருக்கங்கள்.",
   "A clearer path to care.": "கவனிப்புக்கான தெளிவான பாதை.",
@@ -423,7 +425,7 @@
   "Stopped": "நிறுத்தப்பட்டது",
   "Supabase workspace": "Supabase பணிமனை",
   "Supported conditions": "ஆதரிக்கப்படும் நிலைகள்",
-  "Switch to a clinician account to record an independent review.": "சுயாதீனமான மதிப்பீட்டைப் பதிவு செய்ய மருத்துவர் கணக்கிற்கு மாறவும்.",
+  "Awaiting clinician review.": "மருத்துவரின் மதிப்பாய்வுக்காகக் காத்திருக்கிறது.",
   "Synthetic demo · Changes stay in this browser. Role switching is for demonstration only.": "செயற்கை டெமோ · மாற்றங்கள் இந்த உலாவியிலேயே இருக்கும். பாத்திரம் மாறுவது காட்சிப்படுத்துவதற்காக மட்டுமே.",
   "Synthetic demonstration · recording disabled": "செயற்கை செயல்முறை விளக்கம் · பதிவு முடக்கப்பட்டுள்ளது",
   "Take oral photos": "வாய்வழி புகைப்படங்களை எடுக்கவும்",
@@ -791,5 +793,16 @@
   "Not enabled for clinical use": "மருத்துவ பயன்பாட்டிற்காக இயக்கப்படவில்லை",
   "Mock workflow test": "போலி பணிப்பாய்வு சோதனை",
   "Google Gemini · Research only": "Google Gemini · ஆராய்ச்சிக்கு மட்டும்",
-  "Local image checks": "உள்ளூர் படச் சோதனைகள்"
+  "Local image checks": "உள்ளூர் படச் சோதனைகள்",
+  "Care workspace": "பராமரிப்பு பணியிடம்",
+  "Image quality checks assess exposure and sharpness, not disease.": "படத் தரச் சோதனைகள் வெளிச்சத்தையும் தெளிவையும் மதிப்பிடுகின்றன, நோயை அல்ல.",
+  "Image analysis (optional)": "படப் பகுப்பாய்வு (விருப்பம்)",
+  "Image analysis is unavailable. Continue with image quality checks and clinician review.": "படப் பகுப்பாய்வு கிடைக்கவில்லை. படத் தரச் சோதனைகள் மற்றும் மருத்துவர் மதிப்பாய்வுடன் தொடரவும்.",
+  "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.": "தானியங்கி நினைவூட்டல் அனுப்புதல் கிடைக்கவில்லை. இங்கே நினைவூட்டல்களைப் பார்த்து நோயாளிகளை நேரடியாகத் தொடர்புகொள்ளவும்.",
+  "Image observations": "படக் கவனிப்புகள்",
+  "SIMULATED ANALYSIS": "உருவகப்படுத்தப்பட்ட பகுப்பாய்வு",
+  "Analyse image": "படத்தைப் பகுப்பாய்வு செய்",
+  "For clinician review": "மருத்துவரின் மதிப்பாய்விற்காக",
+  "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "சேமித்த பிறகு வாய்ப் புகைப்படங்களைச் சேர்க்க நோயாளியின் பதிவைத் திறக்கவும். பதிவேற்றுவதற்கு முன் புகைப்பட ஒப்புதலைப் பதிவு செய்யவும்.",
+  "File uploads are unavailable. Contact your workspace administrator.": "கோப்புப் பதிவேற்றம் கிடைக்கவில்லை. பணியிட நிர்வாகியைத் தொடர்புகொள்ளவும்."
 }

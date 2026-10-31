@@ -1943,8 +1943,8 @@ function PatientDetail({
                   <p className="form-notice">
                     {localize(
                       lang,
-                      "Image AI is not connected. Ask your workspace administrator to finish setup. Image quality checks remain available.",
-                      "పరీక్ష మోడల్ ఇంకా అనుసంధానం కాలేదు.",
+                      "Image analysis is unavailable. Continue with image quality checks and clinician review.",
+                      "చిత్ర విశ్లేషణ అందుబాటులో లేదు. చిత్ర నాణ్యత తనిఖీలు మరియు వైద్య సమీక్షతో కొనసాగించండి.",
                     )}
                   </p>
                 )}
@@ -2155,10 +2155,10 @@ function PatientDetail({
                     </button>
                   </form>
                 ) : (
-                  !isClinician && (
+                  !isClinician && screening?.status === "awaiting_clinician" && (
                     <div className="form-notice">
                       <Stethoscope size={19} />
-                      {t("onlyDoctor")}
+                      {t("awaitingClinicianReview")}
                     </div>
                   )
                 )}

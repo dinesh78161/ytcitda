@@ -4245,6 +4245,8 @@ main,
   color: #2563eb !important;
 }
 .ai-detected-condition-card {
+  border: 1px solid #dce7e1;
+  background: #f5f8f6;
   margin: 0 0 10px;
   border-radius: 9px;
   padding: 10px 14px;

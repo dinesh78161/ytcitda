@@ -1,4 +1,6 @@
 {
+  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "বিশ্লেষণের সময়সীমার মধ্যে জেমিনি সাড়া দেয়নি। পরে আবার চেষ্টা করুন; কোনো বিশ্লেষণ সংরক্ষিত হয়নি।",
+  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "আবার চেষ্টা করেও সার্ভার জেমিনির সঙ্গে সংযোগ করতে পারেনি। প্রশাসককে Google-এর সঙ্গে হোস্টিং সংযোগ পরীক্ষা করতে বলুন; কোনো বিশ্লেষণ সংরক্ষিত হয়নি।",
   "Clinical reports": "চিকিৎসা প্রতিবেদন",
   "Screening, referral and care summaries for records you can access.": "আপনি দেখতে পারেন এমন রেকর্ডের স্ক্রিনিং, রেফারেল ও পরিচর্যার সারাংশ।",
   "A clearer path to care.": "যতœের আরও স্পষ্ট পথ।",
@@ -423,7 +425,7 @@
   "Stopped": "বন্ধ করা হয়েছে",
   "Supabase workspace": "সুপাবেস ওয়ার্কস্পেস",
   "Supported conditions": "সমর্থিত শর্তাবলী",
-  "Switch to a clinician account to record an independent review.": "স্বাধীন পর্যালোচনা রেকর্ড করতে একজন চিকিৎসকের অ্যাকাউন্টে স্যুইচ করুন।",
+  "Awaiting clinician review.": "চিকিৎসকের পর্যালোচনার অপেক্ষায়।",
   "Synthetic demo · Changes stay in this browser. Role switching is for demonstration only.": "সিন্থেটিক ডেমো · পরিবর্তনগুলি এই ব্রাউজারে থাকে। রোল স্যুইচ করা শুধুমাত্র প্রদর্শনের জন্য।",
   "Synthetic demonstration · recording disabled": "সিন্থেটিক প্রদর্শন · রেকর্ডিং নিষ্ক্রিয় করা হয়েছে",
   "Take oral photos": "মুখের ছবি তুলুন",
@@ -791,5 +793,16 @@
   "Not enabled for clinical use": "ক্লিনিক্যাল ব্যবহারের জন্য অনুমোদিত নয়",
   "Mock workflow test": "মক ওয়ার্কফ্লো পরীক্ষা",
   "Google Gemini · Research only": "গুগল জেমিনি · শুধুমাত্র গবেষণা",
-  "Local image checks": "স্থানীয় ছবি পরীক্ষা"
+  "Local image checks": "স্থানীয় ছবি পরীক্ষা",
+  "Care workspace": "পরিচর্যা কর্মক্ষেত্র",
+  "Image quality checks assess exposure and sharpness, not disease.": "ছবির গুণমান পরীক্ষা আলো ও স্পষ্টতা মূল্যায়ন করে, রোগ নয়।",
+  "Image analysis (optional)": "ছবি বিশ্লেষণ (ঐচ্ছিক)",
+  "Image analysis is unavailable. Continue with image quality checks and clinician review.": "ছবি বিশ্লেষণ উপলব্ধ নেই। ছবির গুণমান পরীক্ষা ও চিকিৎসকের পর্যালোচনা চালিয়ে যান।",
+  "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.": "স্বয়ংক্রিয় রিমাইন্ডার পাঠানো উপলব্ধ নেই। এখানে রিমাইন্ডার দেখুন এবং রোগীদের সঙ্গে সরাসরি যোগাযোগ করুন।",
+  "Image observations": "ছবির পর্যবেক্ষণ",
+  "SIMULATED ANALYSIS": "অনুকরণ বিশ্লেষণ",
+  "Analyse image": "ছবি বিশ্লেষণ করুন",
+  "For clinician review": "চিকিৎসকের পর্যালোচনার জন্য",
+  "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "সংরক্ষণের পরে মুখের ছবি যোগ করতে রোগীর রেকর্ড খুলুন। আপলোড করার আগে ছবির সম্মতি নথিভুক্ত করুন।",
+  "File uploads are unavailable. Contact your workspace administrator.": "ফাইল আপলোড উপলব্ধ নেই। আপনার কর্মক্ষেত্রের প্রশাসকের সঙ্গে যোগাযোগ করুন।"
 }

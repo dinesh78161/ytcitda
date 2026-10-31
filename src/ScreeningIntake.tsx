@@ -772,8 +772,8 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="form-notice">
                   {copy(
-                    "Next: open the saved patient record to capture educational photographs. Photos require separate consent. Offline intakes wait in the registration queue until reconnecting.",
-                    "తదుపరి: విద్యాపరమైన చిత్రాల కోసం సేవ్ చేసిన రోగి రికార్డు తెరవండి. చిత్రాలకు ప్రత్యేక సమ్మతి అవసరం. ఆఫ్‌లైన్ వివరాలు కనెక్షన్ వచ్చే వరకు క్యూలో ఉంటాయి.",
+                    "After saving, open the patient record to add oral photographs. Record photo consent before uploading.",
+                    "సేవ్ చేసిన తర్వాత నోటి చిత్రాలను జోడించడానికి రోగి రికార్డు తెరవండి. అప్‌లోడ్ చేయడానికి ముందు చిత్ర సమ్మతి నమోదు చేయండి.",
                   )}
                 </div>
               </>

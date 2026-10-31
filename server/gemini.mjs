@@ -1,4 +1,5 @@
 import { HttpError, requireValue } from "./validation.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 
 export const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
 export const MEDGEMMA_DEFAULT_MODEL = "medgemma-1.5-oral-quality";
@@ -122,6 +123,8 @@ export async function analyzeWithGemini({
   language = "en",
   fetcher = fetch,
   engine = "gemini",
+  timeoutMs = 45000,
+  retryDelayMs = 500,
 }) {
   requireValue(
     typeof language === "string" && Object.hasOwn(reportLanguages, language),
@@ -138,54 +141,78 @@ export async function analyzeWithGemini({
     503,
     "Configure a valid Gemini model ID.",
   );
-  let response;
-  try {
-    response = await fetcher(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        redirect: "error",
-        signal: AbortSignal.timeout(45000),
-        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text:
-                  instructions +
-                  ` Write all report prose in ${reportLanguages[language]} (${language}) using its native script. Preserve uncertainty and all clinical limitations.`,
-              },
-            ],
+  const signal = AbortSignal.timeout(timeoutMs);
+  const timeoutError = () =>
+    new HttpError(
+      504,
+      "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.",
+    );
+  const request = {
+    method: "POST",
+    redirect: "error",
+    signal,
+    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [
+          {
+            text:
+              instructions +
+              ` Write all report prose in ${reportLanguages[language]} (${language}) using its native script. Preserve uncertainty and all clinical limitations.`,
           },
-          contents: [
+        ],
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
             {
-              role: "user",
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: "image/jpeg",
-                    data: Buffer.from(bytes).toString("base64"),
-                  },
-                },
-                {
-                  text: "Describe this image using the supplied schema. The photo is the only case information available.",
-                },
-              ],
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: Buffer.from(bytes).toString("base64"),
+              },
+            },
+            {
+              text: "Describe this image using the supplied schema. The photo is the only case information available.",
             },
           ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseJsonSchema: schema,
-            maxOutputTokens: 4096,
-          },
-        }),
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseJsonSchema: schema,
+        maxOutputTokens: 4096,
       },
-    );
-  } catch {
-    throw new HttpError(
-      502,
-      "Gemini is unavailable or timed out. Retry without changing the patient record.",
-    );
+    }),
+  };
+  let response;
+  // One retry for transient failures, sharing the original time limit.
+  // Never retry quota, authentication, model-access or malformed-report errors.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await fetcher(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        request,
+      );
+      if (![500, 502, 503, 504].includes(response.status) || attempt === 1)
+        break;
+      await response.body?.cancel();
+    } catch (error) {
+      if (signal.aborted) throw timeoutError();
+      if (attempt === 1) {
+        if (error?.name === "TimeoutError" || error?.name === "AbortError")
+          throw timeoutError();
+        throw new HttpError(
+          502,
+          "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.",
+        );
+      }
+    }
+    try {
+      await delay(retryDelayMs, undefined, { signal });
+    } catch {
+      throw timeoutError();
+    }
   }
   requireValue(
     response.ok,
@@ -200,6 +227,7 @@ export async function analyzeWithGemini({
   try {
     raw = await response.json();
   } catch {
+    if (signal.aborted) throw timeoutError();
     throw new HttpError(
       502,
       "Gemini returned an unreadable response. No analysis was saved.",

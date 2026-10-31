@@ -41,7 +41,10 @@ export default function OralAnalysis({
     if (result && !analyzing && cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect();
       if (rect.top > 250 || rect.top < 0) {
-        cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        cardRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
       }
     }
   }, [result?.id, analyzing]);
@@ -106,55 +109,10 @@ export default function OralAnalysis({
   const measurement = (key: string, unit = "") =>
     typeof quality?.[key] === "number" ? `${quality[key]}${unit}` : "—";
 
-  let conditionTitle = "";
-  let riskLevel: "high" | "moderate" | "low" = "low";
-  let triageAction = copy("Routine Follow-up", "సాధారణ ఫాలో-అప్");
-  let confidenceStr = "—";
-
-  if (findings?.possible_conditions && findings.possible_conditions.length > 0) {
-    conditionTitle = findings.possible_conditions[0].name;
-  } else if (result?.research_label && result.research_label !== "demo_review_required") {
-    conditionTitle = result.research_label.replaceAll("_", " ");
-  } else if (findings?.visible_findings && findings.visible_findings.length > 0) {
-    conditionTitle = findings.visible_findings[0];
-  } else if (result) {
-    conditionTitle = copy("Oral Mucosal Finding Recorded", "నోటి శ్లేష్మ పరిశీలన నమోదు చేయబడింది");
-  }
-
-  const textToCheck = `${conditionTitle} ${findings?.summary || ""}`.toLowerCase();
-  if (
-    textToCheck.includes("erythro") ||
-    textToCheck.includes("cancer") ||
-    textToCheck.includes("carcinoma") ||
-    textToCheck.includes("severe") ||
-    textToCheck.includes("malignan") ||
-    textToCheck.includes("speckled")
-  ) {
-    riskLevel = "high";
-    triageAction = copy("Priority MO Review < 24h", "ప్రాధాన్యత MO సమీక్ష < 24గం");
-  } else if (
-    textToCheck.includes("leukoplakia") ||
-    textToCheck.includes("osmf") ||
-    textToCheck.includes("fibrosis") ||
-    textToCheck.includes("lichen") ||
-    textToCheck.includes("ulcer") ||
-    textToCheck.includes("moderate")
-  ) {
-    riskLevel = "moderate";
-    triageAction = copy("Specialist Review < 7d", "స్పెషలిస్ట్ సమీక్ష < 7 రోజులు");
-  } else {
-    riskLevel = "low";
-    triageAction = copy("Routine Screening Follow-up", "సాధారణ స్క్రీనింగ్ ఫాలో-అప్");
-  }
-
-  if (score !== null && score !== undefined && score > 0) {
-    confidenceStr = `${(score * 100).toFixed(1)}%`;
-  } else if (quality?.sharpness) {
-    const confVal = Math.min(97.8, Math.max(91.2, 92 + (Number(quality.sharpness) % 6) + 0.2));
-    confidenceStr = `${confVal.toFixed(1)}%`;
-  } else if (result) {
-    confidenceStr = "95.2%";
-  }
+  const conditionTitle =
+    findings?.image_kind === "oral_photo"
+      ? findings.possible_conditions[0]?.name || findings.visible_findings[0]
+      : null;
 
   return (
     <article
@@ -171,10 +129,6 @@ export default function OralAnalysis({
         </div>
         {imageSource ? (
           <div className="image-with-overlays">
-            <div className="vision-active-badge">
-              <span className="live-dot" />
-              {copy("Automated AI Vision Active", "ఆటోమేటెడ్ AI విజన్ యాక్టివ్")}
-            </div>
             <img
               className="oral-analysis-photo photo-reveal-animated"
               src={imageSource}
@@ -184,14 +138,6 @@ export default function OralAnalysis({
                 setPreviewError(true);
               }}
             />
-            <div className="image-quality-overlay-pills">
-              <span className="quality-pill sharpness">
-                +{quality?.sharpness ? quality.sharpness : "42.5"}% Sharpness
-              </span>
-              <span className="quality-pill super-res">
-                Edge Super-Res
-              </span>
-            </div>
           </div>
         ) : (
           <div className="photo-placeholder oral-preview-placeholder scanning-active">
@@ -250,7 +196,9 @@ export default function OralAnalysis({
           <small>
             {image.oral_view || image.quality_details?.subsite
               ? oralViewLabel(
-                  ((image.quality_details?.subsite as string) || image.oral_view || ""),
+                  (image.quality_details?.subsite as string) ||
+                    image.oral_view ||
+                    "",
                   lang,
                 )
               : copy("Oral view", "నోటి భాగం")}
@@ -333,10 +281,7 @@ export default function OralAnalysis({
         aria-label={
           isClinical
             ? copy("Clinician image review", "వైద్యుని చిత్ర సమీక్ష")
-            : copy(
-                "Research image observations",
-                "క్లినికల్ స్క్రీనింగ్ AI పరిశీలనలు",
-              )
+            : copy("Image observations", "చిత్ర పరిశీలనలు")
         }
         aria-busy={analyzing}
       >
@@ -362,26 +307,24 @@ export default function OralAnalysis({
               <div>
                 <span className="analysis-eyebrow">
                   <Activity size={15} />
-                  {copy("RESEARCH IMAGE REVIEW", "క్లినికల్ AI వర్క్‌స్పేస్")}
+                  {copy("Image analysis", "చిత్ర విశ్లేషణ")}
                 </span>
-                <h3>
-                  {copy(
-                    "Research image observations",
-                    "క్లినికల్ స్క్రీనింగ్ AI పరిశీలనలు",
-                  )}
-                </h3>
+                <h3>{copy("Image observations", "చిత్ర పరిశీలనలు")}</h3>
               </div>
               <span className="analysis-mode">
                 {medgemmaMode
                   ? copy(
                       "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
-                      "గూగుల్ మెడ్‌జెమ్మా · క్లినికల్ CDSS",
+                      "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
                     )
                   : visionResult
-                    ? copy("GEMINI · RESEARCH ONLY", "జెమిని · క్లినికల్ CDSS")
+                    ? copy(
+                        "GEMINI · RESEARCH ONLY",
+                        "జెమిని · పరిశోధన కోసం మాత్రమే",
+                      )
                     : mock
-                      ? copy("MOCK WORKFLOW TEST", "క్లినికల్ ట్రయాజ్ మోడ్")
-                      : copy("RESEARCH EVALUATION", "క్లినికల్ AI మోడ్")}
+                      ? copy("SIMULATED ANALYSIS", "అనుకరణ విశ్లేషణ")
+                      : copy("RESEARCH EVALUATION", "పరిశోధన మూల్యాంకనం")}
               </span>
             </div>
 
@@ -416,37 +359,29 @@ export default function OralAnalysis({
                           )
                         : geminiMode
                           ? result
-                            ? copy("Re-analyse with Gemini", "జెమినితో మళ్లీ విశ్లేషించండి")
-                            : copy("Analyse with Gemini", "జెమినితో విశ్లేషించండి")
-                          : copy(
-                              "Run research image analysis",
-                              "క్లినికల్ AI విశ్లేషణను ప్రారంభించండి",
-                            )}
+                            ? copy(
+                                "Re-analyse with Gemini",
+                                "జెమినితో మళ్లీ విశ్లేషించండి",
+                              )
+                            : copy(
+                                "Analyse with Gemini",
+                                "జెమినితో విశ్లేషించండి",
+                              )
+                          : copy("Analyse image", "చిత్రాన్ని విశ్లేషించండి")}
                 </button>
               </div>
             )}
 
             {result && conditionTitle && (
-              <div className={`ai-detected-condition-card risk-border-${riskLevel}`}>
+              <div className="ai-detected-condition-card">
                 <div className="ai-detected-condition-header">
                   <span className="ai-detected-condition-badge-title">
-                    <Sparkles size={15} style={{ color: riskLevel === "high" ? "#dc2626" : "#2563eb" }} />
-                    {copy("AI AUTO-DETECTED CONDITION", "AI ఆటో-గుర్తింపు పరిస్థితి")}
-                  </span>
-                  <span className={`risk-pill risk-${riskLevel}`}>
-                    {riskLevel === "high"
-                      ? copy("HIGH RISK", "అధిక ప్రమాదం")
-                      : riskLevel === "moderate"
-                        ? copy("MODERATE RISK", "మధ్యస్థ ప్రమాదం")
-                        : copy("LOW RISK", "తక్కువ ప్రమాదం")}
+                    <Sparkles size={15} />
+                    {copy("For clinician review", "వైద్యుని సమీక్ష కోసం")}
                   </span>
                 </div>
-                <div className="ai-detected-condition-name">{conditionTitle}</div>
-                <div className="ai-detected-condition-meta">
-                  <span className="ai-detected-confidence">
-                    {copy("Confidence:", "విశ్వసనీయత:")} <strong>{confidenceStr}</strong>
-                  </span>
-                  <span className="ai-detected-priority-action">{triageAction}</span>
+                <div className="ai-detected-condition-name">
+                  {conditionTitle}
                 </div>
               </div>
             )}
@@ -456,7 +391,7 @@ export default function OralAnalysis({
                 className={`analysis-result-box ${result && !mock ? "has-research-result" : ""}`}
               >
                 <span className="analysis-eyebrow">
-                  {copy("IMAGE OBSERVATIONS", "క్లినికల్ AI మూల్యాంకనం")}
+                  {copy("Image observations", "చిత్ర పరిశీలనలు")}
                 </span>
                 <h4>
                   {!consent
@@ -477,7 +412,7 @@ export default function OralAnalysis({
                                 "Clinical evaluation required",
                                 "క్లినికల్ మూల్యాంకనం అవసరం",
                               )
-                            : result.research_label.replaceAll("_", " ")
+                            : copy("Image observations", "చిత్ర పరిశీలనలు")
                         : copy(
                             "Ready for image analysis",
                             "చిత్ర విశ్లేషణకు సిద్ధం",
@@ -485,7 +420,9 @@ export default function OralAnalysis({
                 </h4>
                 {!visionResult && (
                   <div className="analysis-score">
-                    <span>{copy("Model class score", "మోడల్ వర్గ స్కోర్")}</span>
+                    <span>
+                      {copy("Model class score", "మోడల్ వర్గ స్కోర్")}
+                    </span>
                     <strong>
                       {consent && score !== null
                         ? `${(score * 100).toFixed(1)}%`
@@ -515,11 +452,11 @@ export default function OralAnalysis({
                           )
                         : copy(
                             "Workflow test only. No medical prediction is produced.",
-                            "ప్రామాణిక నిర్ణయ మద్దతు మోడ్ క్రియాశీలకంగా ఉంది. వైద్య అధికారి ఆమోదం కోసం వేచి ఉంది.",
+                            "వర్క్‌ఫ్లో పరీక్ష మాత్రమే. వైద్య అంచనా ఇవ్వబడదు.",
                           )
                       : copy(
                           "Uncalibrated research model score; it is not a disease probability. Independent clinician examination is required.",
-                          "ప్రామాణిక క్లినికల్ స్క్రీనింగ్ విశ్వసనీయత స్కోర్. తుది నిర్ధారణను వైద్య అధికారి ధృవీకరిస్తారు.",
+                          "క్రమాంకనం చేయని పరిశోధన మోడల్ స్కోర్; ఇది వ్యాధి సంభావ్యత కాదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
                         )}
                 </p>
               </div>

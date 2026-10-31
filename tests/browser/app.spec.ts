@@ -21,7 +21,7 @@ async function register(page: Page, name: string) {
     .getByLabel("Screening consent recorded in the selected language")
     .check();
   await dialog
-    .getByLabel("Separate consent for educational oral photographs")
+    .getByLabel("Separate consent for intraoral clinical photographs")
     .check();
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
@@ -542,7 +542,14 @@ test("photo decoding, retake guidance and nonclinical mock analysis", async ({
   await expect(accepted).toContainText("No medical prediction was made.");
   await expect(accepted.locator(".analysis-score strong")).toHaveText("—");
   await expect(accepted.locator("meter")).toHaveCount(0);
-  await expect(accepted).toContainText("Independent clinician examination required");
+  await expect(accepted.locator(".ai-detected-condition-card")).toHaveCount(0);
+  await expect(
+    accepted.locator(".vision-active-badge, .image-quality-overlay-pills"),
+  ).toHaveCount(0);
+  await expect(accepted).not.toContainText("Confidence:");
+  await expect(accepted).toContainText(
+    "Independent clinician examination required",
+  );
   await expect(accepted).toContainText("Not assessed");
   await page.locator(".toast .icon-button").click();
   await accepted.screenshot({ path: "test-results/oral-analyser-desktop.png" });
@@ -628,6 +635,7 @@ test("photo decoding, retake guidance and nonclinical mock analysis", async ({
   await expect(report).toContainText("Synthetic Gemini report fixture");
   await expect(report.locator(".analysis-score")).toHaveCount(0);
   await expect(report.locator("meter")).toHaveCount(0);
+  await expect(report.locator(".ai-detected-condition-card")).toHaveCount(0);
   await expect(page.locator('[data-step="analysis"]')).toHaveAttribute(
     "data-state",
     "recorded",

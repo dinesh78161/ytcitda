@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServices } from "../server/index.mjs";
 import { TokenVerifier } from "livekit-server-sdk";
+import { analyzeWithGemini } from "../server/gemini.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 function harness(overrides = {}, providerResponse) {
   const person = crypto.randomUUID(),
     actor = crypto.randomUUID(),
@@ -201,6 +203,93 @@ const geminiResponse = (report = geminiReport()) =>
       },
     ],
   });
+
+test("Gemini retries transient failures once using the same model, image and deadline", async () => {
+  for (const failure of [
+    () => new Response("{}", { status: 503 }),
+    () => {
+      throw new TypeError("fetch failed");
+    },
+  ]) {
+    const calls = [];
+    const result = await analyzeWithGemini({
+      bytes: Buffer.from("synthetic-jpeg"),
+      key: "synthetic-key",
+      retryDelayMs: 1,
+      fetcher: async (url, request) => {
+        calls.push({ url, request });
+        return calls.length === 1 ? failure() : geminiResponse();
+      },
+    });
+    assert.equal(result.status, "completed");
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].url, calls[1].url);
+    assert.equal(calls[0].request.body, calls[1].request.body);
+    assert.equal(calls[0].request.signal, calls[1].request.signal);
+    assert.equal(result.clinical_use, false);
+  }
+});
+
+test("Gemini never retries quota, credentials, model access or malformed output", async () => {
+  for (const status of [400, 401, 403, 404, 429, 200]) {
+    let calls = 0;
+    await assert.rejects(() =>
+      analyzeWithGemini({
+        bytes: Buffer.from("synthetic-jpeg"),
+        key: "synthetic-key",
+        retryDelayMs: 1,
+        fetcher: async () => {
+          calls++;
+          return new Response("{}", { status });
+        },
+      }),
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+test("Gemini distinguishes exhausted deadlines, body timeouts and persistent connection failures", async () => {
+  for (const readingBody of [false, true]) {
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        analyzeWithGemini({
+          bytes: Buffer.from("synthetic-jpeg"),
+          key: "synthetic-key",
+          timeoutMs: 20,
+          retryDelayMs: 1,
+          fetcher: async (_url, { signal }) => {
+            calls++;
+            const stalled = () => delay(1000, undefined, { signal });
+            if (!readingBody) return stalled();
+            return { ok: true, status: 200, json: stalled };
+          },
+        }),
+      (error) => error.status === 504 && /time limit/.test(error.message),
+    );
+    assert.equal(calls, 1);
+  }
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      analyzeWithGemini({
+        bytes: Buffer.from("synthetic-jpeg"),
+        key: "synthetic-key",
+        retryDelayMs: 1,
+        fetcher: async () => {
+          calls++;
+          throw new TypeError(
+            "private upstream diagnostic that must not reach the browser",
+          );
+        },
+      }),
+    (error) =>
+      error.status === 502 &&
+      /could not connect/.test(error.message) &&
+      !/private/.test(error.message),
+  );
+  assert.equal(calls, 2);
+});
 
 test("Gemini receives only image data and returns persisted observations without a fabricated score", async () => {
   const h = harness(

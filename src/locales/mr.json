@@ -1,4 +1,6 @@
 {
+  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "जेमिनीने विश्लेषणाच्या वेळमर्यादेत प्रतिसाद दिला नाही. नंतर पुन्हा प्रयत्न करा; कोणतेही विश्लेषण जतन झाले नाही.",
+  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "पुन्हा प्रयत्न करूनही सर्व्हर जेमिनीशी जोडला गेला नाही. प्रशासकाला Google सोबतचे होस्टिंग कनेक्शन तपासण्यास सांगा; कोणतेही विश्लेषण जतन झाले नाही.",
   "Clinical reports": "वैद्यकीय अहवाल",
   "Screening, referral and care summaries for records you can access.": "तुम्हाला उपलब्ध असलेल्या नोंदींचे तपासणी, रेफरल आणि देखभाल सारांश.",
   "A clearer path to care.": "काळजीसाठी एक स्पष्ट मार्ग.",
@@ -423,7 +425,7 @@
   "Stopped": "थांबवले",
   "Supabase workspace": "सुपबेस वर्कस्पेस",
   "Supported conditions": "समर्थित परिस्थिती",
-  "Switch to a clinician account to record an independent review.": "स्वतंत्र पुनरावलोकन नोंदवण्यासाठी वैद्यकीय तज्ज्ञांच्या खात्यावर स्विच करा.",
+  "Awaiting clinician review.": "वैद्यकीय पुनरावलोकनाच्या प्रतीक्षेत.",
   "Synthetic demo · Changes stay in this browser. Role switching is for demonstration only.": "सिंथेटिक डेमो · बदल या ब्राउझरमध्ये राहतात. भूमिका बदलणे केवळ निदर्शनासाठी आहे.",
   "Synthetic demonstration · recording disabled": "सिंथेटिक निदर्शन · रेकॉर्डिंग अक्षम केले",
   "Take oral photos": "तोंधाचे फोटो घ्या",
@@ -791,5 +793,16 @@
   "Not enabled for clinical use": "क्लिनिकल वापरासाठी सक्षम नाही",
   "Mock workflow test": "मॉक् वर्कफ्लो चाचणी",
   "Google Gemini · Research only": "गुगल जेमिनी · केवळ संशोधनासाठी",
-  "Local image checks": "स्थानिक प्रतिमा तपासणी"
+  "Local image checks": "स्थानिक प्रतिमा तपासणी",
+  "Care workspace": "देखभाल कार्यक्षेत्र",
+  "Image quality checks assess exposure and sharpness, not disease.": "प्रतिमेच्या गुणवत्तेच्या तपासण्या प्रकाश आणि स्पष्टतेचे मूल्यांकन करतात, आजाराचे नाही.",
+  "Image analysis (optional)": "प्रतिमा विश्लेषण (ऐच्छिक)",
+  "Image analysis is unavailable. Continue with image quality checks and clinician review.": "प्रतिमा विश्लेषण उपलब्ध नाही. प्रतिमेच्या गुणवत्तेच्या तपासण्या आणि वैद्यकीय पुनरावलोकन सुरू ठेवा.",
+  "Automatic reminder delivery is unavailable. Review reminders here and contact patients directly.": "स्वयंचलित स्मरणपत्र वितरण उपलब्ध नाही. येथे स्मरणपत्रे तपासा आणि रुग्णांशी थेट संपर्क साधा.",
+  "Image observations": "प्रतिमा निरीक्षणे",
+  "SIMULATED ANALYSIS": "अनुकरण विश्लेषण",
+  "Analyse image": "प्रतिमेचे विश्लेषण करा",
+  "For clinician review": "वैद्यकीय पुनरावलोकनासाठी",
+  "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "जतन केल्यानंतर तोंडाचे फोटो जोडण्यासाठी रुग्णाची नोंद उघडा. अपलोड करण्यापूर्वी फोटोची संमती नोंदवा.",
+  "File uploads are unavailable. Contact your workspace administrator.": "फाइल अपलोड उपलब्ध नाही. आपल्या कार्यक्षेत्र प्रशासकाशी संपर्क साधा."
 }
