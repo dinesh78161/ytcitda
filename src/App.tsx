@@ -177,9 +177,11 @@ export default function App() {
   const allowedNav =
     w.profile?.role === "district_admin"
       ? navItems.filter((n) => ["overview", "reports"].includes(n.id))
-      : w.profile?.role === "navigator"
-        ? navItems.filter((n) => n.id !== "screenings")
-        : navItems;
+      : navItems.filter((n) => {
+          if (n.id === "reports") return false;
+          if (n.id === "screenings" && w.profile?.role === "navigator") return false;
+          return true;
+        });
   const patient = w.data.patients.find((p) => p.id === selected);
   return (
     <Context.Provider value={{ w, lang, t, notify, run }}>
@@ -437,8 +439,14 @@ export default function App() {
                 <Appointments openPatient={setSelected} />
               ) : page === "followups" ? (
                 <FollowUps openPatient={setSelected} />
-              ) : page === "reports" ? (
+              ) : page === "reports" && w.profile?.role === "district_admin" ? (
                 <Reports />
+              ) : page === "reports" ? (
+                <Overview
+                  openPatient={setSelected}
+                  navigate={navigate}
+                  register={() => setRegistration(true)}
+                />
               ) : (
                 <WorkspaceSettings />
               )}
