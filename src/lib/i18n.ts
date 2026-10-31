@@ -36,6 +36,11 @@ export const labels = {
   appointments: ["Appointments", "అపాయింట్‌మెంట్‌లు"],
   followups: ["Care navigation", "సంరక్షణ సమన్వయం"],
   reports: ["District reports", "జిల్లా నివేదికలు"],
+  clinicalReports: ["Clinical reports", "వైద్య నివేదికలు"],
+  clinicalReportsText: [
+    "Screening, referral and care summaries for records you can access.",
+    "మీరు చూడగల రికార్డుల పరీక్షలు, సిఫార్సులు మరియు సంరక్షణ సారాంశాలు.",
+  ],
   settings: ["Settings", "సెట్టింగ్‌లు"],
   workspace: ["CARE WORKSPACE", "సంరక్షణ కేంద్రం"],
   programme: ["AAROHAN 2026 · ITDA PADERU", "ఆరోహణ్ 2026 · ఐటీడీఏ పాడేరు"],

@@ -178,10 +178,12 @@ export default function App() {
     w.profile?.role === "district_admin"
       ? navItems.filter((n) => ["overview", "reports"].includes(n.id))
       : navItems.filter((n) => {
-          if (n.id === "reports") return false;
+          if (n.id === "reports") return clinician(w.profile?.role);
           if (n.id === "screenings" && w.profile?.role === "navigator") return false;
           return true;
         });
+  const pageLabel = (id: Page) =>
+    t(id === "reports" && clinician(w.profile?.role) ? "clinicalReports" : id);
   const patient = w.data.patients.find((p) => p.id === selected);
   return (
     <Context.Provider value={{ w, lang, t, notify, run }}>
@@ -225,7 +227,7 @@ export default function App() {
                   onClick={() => navigate(id)}
                 >
                   <Icon size={19} />
-                  <span>{t(id)}</span>
+                  <span>{pageLabel(id)}</span>
                   {id === "screenings" &&
                     w.data.screenings.filter(
                       (s) => s.status === "awaiting_clinician",
@@ -272,7 +274,7 @@ export default function App() {
                 <span className="breadcrumb">
                   {t("workspace")}
                   <ChevronRight size={14} />
-                  <strong>{selected ? t("patientRecord") : t(page)}</strong>
+                  <strong>{selected ? t("patientRecord") : pageLabel(page)}</strong>
                 </span>
                 {isClinical && (
                   <small className="workspace-mode">
@@ -439,7 +441,9 @@ export default function App() {
                 <Appointments openPatient={setSelected} />
               ) : page === "followups" ? (
                 <FollowUps openPatient={setSelected} />
-              ) : page === "reports" && w.profile?.role === "district_admin" ? (
+              ) : page === "reports" &&
+                (w.profile.role === "district_admin" ||
+                  clinician(w.profile.role)) ? (
                 <Reports />
               ) : page === "reports" ? (
                 <Overview
@@ -2523,6 +2527,7 @@ function AggregateChart() {
 }
 function Reports() {
   const { w, t } = useApp();
+  const admin = w.profile?.role === "district_admin";
   const rate = w.summary.screenings
     ? Math.round((w.summary.referrals / w.summary.screenings) * 100)
     : 0;
@@ -2552,8 +2557,8 @@ function Reports() {
   return (
     <>
       <PageHeading
-        title={t("reportsTitle")}
-        subtitle={t("reportsText")}
+        title={t(admin ? "reportsTitle" : "clinicalReports")}
+        subtitle={t(admin ? "reportsText" : "clinicalReportsText")}
         action={
           <button className="button secondary" onClick={download}>
             <ArrowDownToLine size={18} />
@@ -2585,7 +2590,7 @@ function Reports() {
           <p>{t("referralRateHelp")}</p>
         </section>
       </div>
-      <OutreachPanel />
+      {admin && <OutreachPanel />}
       <JourneyMetrics />
     </>
   );
