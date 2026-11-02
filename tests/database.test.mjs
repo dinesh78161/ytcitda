@@ -72,6 +72,7 @@ before(async () => {
     await db.exec(await sqlFile("supabase/migrations/202610300010_clinical_workspace.sql"));
     await db.exec(await sqlFile("supabase/migrations/202610300011_patient_abdm_identifiers.sql"));
     await db.exec(await sqlFile("supabase/migrations/202610300012_anatomical_subsites.sql"));
+    await db.exec(await sqlFile("supabase/migrations/202611020013_patient_report.sql"));
   }
   for (const [index, name] of [
     "worker",
@@ -133,6 +134,36 @@ async function count(table) {
 }
 const denied = (fn) => assert.rejects(fn, (error) => error.code === "42501");
 const invalid = (fn) => assert.rejects(fn, (error) => error.code === "23514");
+
+test("patient report staff names respect clinician assignments and MFA without exposing profiles", async () => {
+  const query = () => db.query("select * from public.patient_registration_staff()");
+  await denied(() => asRole("anon", null, query));
+  for (const actor of [uid(1), uid(4), uid(5), uid(6)]) {
+    await asRole("authenticated", actor, async () => {
+      assert.equal((await query()).rows.length, 0);
+    });
+  }
+  for (const actor of [uid(2), uid(3)]) {
+    await asRole("authenticated", actor, async () => {
+      const { rows } = await query();
+      const visible = (await db.query("select id from public.patients")).rows;
+      assert.ok(rows.length > 0);
+      assert.ok(rows.every((row) => visible.some((p) => p.id === row.patient_id)));
+      assert.ok(rows.every((row) => typeof row.staff_name === "string" && row.staff_name.length));
+      assert.equal(await count("profiles"), 1);
+    });
+    await asRole("authenticated", actor, async () => {
+      assert.equal((await query()).rows.length, 0);
+    }, "aal1");
+  }
+  await db.exec("begin");
+  try {
+    await db.query("update public.patient_assignments set revoked_at=now() where user_id=$1", [uid(2)]);
+    await db.exec("set local role authenticated");
+    await db.query("select set_config('request.jwt.claim.sub',$1,true),set_config('request.jwt.claims',$2,true)", [uid(2), JSON.stringify({sub: uid(2), aal: "aal2"})]);
+    assert.equal((await query()).rows.length, 0);
+  } finally { await db.exec("rollback"); }
+});
 
 test("all 20 application tables have row level security enabled", async () => {
   const { rows } = await db.query(

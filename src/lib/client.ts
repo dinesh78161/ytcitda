@@ -84,6 +84,23 @@ export async function fetchWorkspace(
   }
   return { data, summary: null };
 }
+export async function fetchPatientRegistrationStaff(): Promise<
+  Record<string, string>
+> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const names: Record<string, string> = {};
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabase
+      .rpc("patient_registration_staff")
+      .order("patient_id")
+      .range(page * 500, (page + 1) * 500 - 1);
+    if (error) throw error;
+    for (const row of data) names[row.patient_id] = row.staff_name;
+    if (data.length < 500) break;
+  }
+  return names;
+}
+
 export async function submitCloud(command: Command) {
   if (!supabase) throw new Error("Supabase is not configured.");
   if (

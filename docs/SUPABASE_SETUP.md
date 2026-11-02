@@ -7,7 +7,7 @@ Keep its database password securely. These files assume a new project without
 existing application tables or Storage policies.
 
 For a new project, open [setup.sql](../supabase/setup.sql), copy the entire file into
-SQL Editor, and run it as `postgres`. It includes all ten migrations and the facility
+SQL Editor, and run it as `postgres`. It includes all thirteen migrations and the facility
 seed in one transaction. Run it once; it refuses to overwrite an existing application
 schema. Regenerate the file after migration changes with `npm run db:prepare`.
 
@@ -24,7 +24,10 @@ the combined setup file):
 8. [Vision-model image findings](../supabase/migrations/202610290008_image_findings.sql)
 9. [Additional patient and consent languages](../supabase/migrations/202610290009_languages.sql)
 10. [Clinical workspace and record separation](../supabase/migrations/202610300010_clinical_workspace.sql)
-11. [Synthetic facilities](../supabase/seed.sql)
+11. [Patient ABDM identifiers](../supabase/migrations/202610300011_patient_abdm_identifiers.sql)
+12. [Anatomical subsites](../supabase/migrations/202610300012_anatomical_subsites.sql)
+13. [Patient report staff names](../supabase/migrations/202611020013_patient_report.sql)
+14. [Synthetic facilities](../supabase/seed.sql)
 
 Apply only migrations that are not already applied. Migrations
 run once in transactions; seeds are repeatable. Keep `app_private` out of the Data
@@ -39,6 +42,12 @@ screening form in Supabase mode. The form keeps its draft and refuses submission
 when that database update is unavailable. Existing staff accounts and historical
 screenings are retained; unrecorded historical findings display as not assessed
 or not recorded.
+
+Migration 013 enables ASHA / ANM names in doctor patient reports. It returns only
+the registering health worker's name for patients assigned to the verified
+clinician. Apply it before deploying the patient report update. The report shows
+an error and disables its patient CSV export if staff names cannot be loaded;
+the aggregate summary export remains available.
 
 Migration 008 adds structured image findings for Gemini. Apply it before enabling
 Gemini analysis; the API checks its presence before sending a photo to Google.

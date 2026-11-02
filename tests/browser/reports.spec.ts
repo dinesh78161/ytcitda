@@ -35,6 +35,42 @@ for (const role of ["medical_officer", "specialist"]) {
       page.getByLabel("Outreach village", { exact: true }),
     ).toHaveCount(0);
 
+    const report = page.getByRole("table", {
+      name: "Patient report",
+      exact: true,
+    });
+    const headers = [
+      "Name of the patient",
+      "Age",
+      "Habitation",
+      "ASHA / ANM name",
+      "Mandal",
+      "Risk level",
+      "Date of registration",
+      "Mobile Number",
+      "Follow-up actions",
+    ];
+    await expect(report.getByRole("columnheader")).toHaveText(headers);
+    const patientRows = report.locator("tbody tr");
+    await expect(patientRows).toHaveCount(role === "specialist" ? 4 : 12);
+    await expect(patientRows.first()).toContainText("Demo Health Worker");
+    await expect(patientRows.first()).toContainText("Priority");
+    const patientDownloading = page.waitForEvent("download");
+    await page
+      .getByRole("button", { name: "Export patient report CSV", exact: true })
+      .click();
+    const patientDownload = await patientDownloading;
+    expect(patientDownload.suggestedFilename()).toBe(
+      "aarogya-patient-report.csv",
+    );
+    const patientCsv = await readFile((await patientDownload.path())!, "utf8");
+    expect(patientCsv.split("\r\n")[0].replace(/^\uFEFF/, "")).toBe(
+      headers.map((header) => `"${header}"`).join(","),
+    );
+    expect(patientCsv).toContain(
+      '"Demo Resident 01","33","G. Madugula","Demo Health Worker"',
+    );
+
     const downloading = page.waitForEvent("download");
     await page
       .getByRole("button", { name: "Export summary CSV", exact: true })
@@ -123,4 +159,19 @@ test("clinical report labels follow the selected language", async ({
     page.getByRole("heading", { name: "వైద్య నివేదికలు", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".breadcrumb")).toContainText("వైద్య నివేదికలు");
+  await expect(
+    page
+      .getByRole("table", { name: "రోగుల నివేదిక", exact: true })
+      .getByRole("columnheader"),
+  ).toHaveText([
+    "రోగి పేరు",
+    "వయస్సు",
+    "ఆవాసం",
+    "ఆశా / ఏఎన్‌ఎం పేరు",
+    "మండలం",
+    "ప్రమాద స్థాయి",
+    "నమోదు తేదీ",
+    "మొబైల్ నంబర్",
+    "తదుపరి చర్యలు",
+  ]);
 });

@@ -1920,6 +1920,23 @@ tbody tr:hover {
   gap: 16px;
   margin-left: 18px;
 }
+.patient-report {
+  min-width: 0;
+  margin-bottom: 24px;
+}
+.patient-report .panel-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.patient-report-help {
+  margin: 0 22px 18px;
+}
+.patient-report td:last-child {
+  min-width: 240px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .report-grid {
   display: grid;
   grid-template-columns: 1.5fr 1fr;

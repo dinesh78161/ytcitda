@@ -85,6 +85,7 @@ import { latestScreening, stages } from "./lib/journey";
 import MfaGate from "./MfaGate";
 import Registration, { IntakeFacts } from "./ScreeningIntake";
 import OralAnalysis from "./OralAnalysis";
+import PatientReport from "./PatientReport";
 import LiveCameraModal from "./LiveCameraModal";
 import {
   GuidedJourney,
@@ -2695,6 +2696,7 @@ function Reports() {
           </button>
         }
       />
+      {!admin && <PatientReport />}
       <div className="report-grid">
         <section className="panel">
           <div className="panel-heading">
