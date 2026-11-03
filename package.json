@@ -21,6 +21,7 @@
     "test:hosted": "node --env-file-if-exists=.env.server --env-file-if-exists=.env.acceptance scripts/check-hosted.mjs",
     "test:hosted:browser": "node --env-file-if-exists=.env.server --env-file-if-exists=.env.acceptance node_modules/@playwright/test/cli.js test --config playwright.hosted.config.ts",
     "test:e2e": "playwright test",
+    "test:video": "playwright test --config playwright.video.config.ts",
     "test:production": "playwright test --config playwright.production.config.ts",
     "format": "prettier --write src tests server scripts *.ts *.json docs README.md",
     "backup:seal": "node --env-file-if-exists=.env.recovery scripts/protect-backup.mjs seal",

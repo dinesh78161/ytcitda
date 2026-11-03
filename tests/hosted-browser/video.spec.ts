@@ -182,7 +182,7 @@ test("two assigned users exchange live video through the configured LiveKit proj
         page.getByRole("button", { name: "Turn camera off", exact: true }),
       ).toBeVisible({ timeout: 30000 });
       await expect(
-        page.getByRole("button", { name: "Mute microphone", exact: true }),
+        page.getByRole("button", { name: "Mute mic", exact: true }),
       ).toBeVisible({ timeout: 30000 });
     }
     for (let i = 0; i < pages.length; i++) {
@@ -222,7 +222,35 @@ test("two assigned users exchange live video through the configured LiveKit proj
           expect.objectContaining({ playing: true }),
           expect.objectContaining({ playing: true }),
         ]);
-      await expect(page.locator(".consultation-tile audio")).toHaveCount(1);
+      await expect(page.locator(".consultation-audio audio")).toHaveCount(1);
+      const enableAudio = page.getByRole("button", {
+        name: "Enable call audio",
+        exact: true,
+      });
+      if (await enableAudio.isVisible()) await enableAudio.click();
+      await expect
+        .poll(
+          () =>
+            page
+              .locator(".consultation-audio audio")
+              .evaluate((element: HTMLAudioElement) => ({
+                playing: !element.paused && element.readyState >= 2,
+                muted: element.muted,
+                volume: element.volume,
+                track: (
+                  element.srcObject as MediaStream | null
+                )?.getAudioTracks()[0]?.readyState,
+              })),
+          { timeout: 30000 },
+        )
+        .toEqual({ playing: true, muted: false, volume: 1, track: "live" });
+      const remoteSize = await page
+        .locator(".consultation-tile-remote")
+        .boundingBox();
+      const localSize = await page
+        .locator(".consultation-tile-local")
+        .boundingBox();
+      expect(remoteSize!.width).toBeGreaterThan(localSize!.width);
       // Give viewers time to see the received streams in requested recordings.
       if (process.env.RECORD_HOSTED_VIDEO_DIR) await page.waitForTimeout(3000);
       await page.getByRole("dialog").screenshot({
@@ -230,10 +258,10 @@ test("two assigned users exchange live video through the configured LiveKit proj
       });
     }
     await pages[0]
-      .getByRole("button", { name: "Mute microphone", exact: true })
+      .getByRole("button", { name: "Mute mic", exact: true })
       .click();
     await expect(
-      pages[0].getByRole("button", { name: "Enable microphone", exact: true }),
+      pages[0].getByRole("button", { name: "Unmute mic", exact: true }),
     ).toBeVisible();
     if (process.env.RECORD_HOSTED_VIDEO_DIR)
       await pages[0].waitForTimeout(1200);

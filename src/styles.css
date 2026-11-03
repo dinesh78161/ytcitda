@@ -152,17 +152,49 @@ select {
 }
 .consultation-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
   gap: 14px;
   margin: 12px 0;
-  align-items: stretch;
+  align-items: start;
 }
 @media (max-width: 768px) {
   .consultation-grid {
     grid-template-columns: 1fr;
   }
+  .consultation-tile-local {
+    width: 45%;
+    min-width: 150px;
+    justify-self: end;
+  }
+}
+.consultation-tile-local .consultation-tile-header {
+  flex-wrap: wrap;
+}
+.consultation-tile-local .consultation-video-viewport {
+  min-height: 120px;
+  aspect-ratio: 4 / 3;
+}
+.consultation-tile-remote .consultation-video-viewport {
+  aspect-ratio: 16 / 9;
+}
+.consultation-audio {
+  display: none;
+}
+.consultation-audio-notice {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff3d6;
+  color: #704600;
+}
+.consultation-remote-audio-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  font-size: 12px;
 }
 .consultation-tile {
+  min-width: 0;
   background: #08211c;
   color: #fff;
   border: 1px solid #143d34;
@@ -358,7 +390,7 @@ select {
 .live-consultation:fullscreen .consultation-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
   gap: 20px;
   min-height: 0;
   margin: 14px 0;
@@ -1422,21 +1454,21 @@ tbody tr:hover {
 .modal.modal-maximized .consultation-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
   gap: 16px;
   min-height: 0;
   margin: 12px 0;
-  align-items: stretch;
+  align-items: start;
 }
 .modal.modal-maximized .consultation-tile {
   min-height: 0;
   height: 100%;
 }
 .modal.modal-maximized .consultation-tile-remote {
-  order: 2;
+  order: 1;
 }
 .modal.modal-maximized .consultation-tile-local {
-  order: 1;
+  order: 2;
 }
 .modal.modal-maximized .consultation-video-viewport {
   min-height: calc(100vh - 250px);
@@ -1447,6 +1479,30 @@ tbody tr:hover {
 }
 .modal.modal-maximized .video-room {
   height: calc(100vh - 160px);
+}
+.modal.modal-maximized .consultation-tile-local,
+.live-consultation:fullscreen .consultation-tile-local {
+  height: auto;
+}
+.modal.modal-maximized .consultation-tile-local .consultation-video-viewport,
+.live-consultation:fullscreen .consultation-tile-local .consultation-video-viewport {
+  height: auto;
+  min-height: 120px;
+}
+@media (max-width: 768px) {
+  .modal.modal-maximized .consultation-grid,
+  .live-consultation:fullscreen .consultation-grid {
+    grid-template-columns: 1fr;
+    flex: none;
+  }
+  .modal.modal-maximized .consultation-tile-remote .consultation-video-viewport,
+  .live-consultation:fullscreen .consultation-tile-remote .consultation-video-viewport {
+    height: auto;
+    min-height: 240px;
+  }
+  .live-consultation:fullscreen {
+    overflow-y: auto;
+  }
 }
 .modal::backdrop {
   background: #0b241f77;

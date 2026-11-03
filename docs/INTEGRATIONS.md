@@ -63,6 +63,21 @@ appointment access every minute, disconnects when authorization cannot be renewe
 and stops local media on leaving or when the appointment window ends. Recording is
 not requested and no recording control is present.
 
+The other participant occupies the main video area; your own camera is a small
+preview on desktop, mobile, maximized dialogs and full screen. Remote sound uses
+separate audio elements. If the browser blocks playback, select **Enable call
+audio**; **Check call audio** retries playback at any time. A microphone status
+below the remote video shows when the participant needs to unmute. Camera and
+microphone permissions are requested independently so a failed camera does not
+prevent voice. Participant names come from the signed-in account profile: a name
+such as **Demo Health Worker** does not select a simulated video transport.
+
+Run `npm run test:video` for isolated browser checks of audio playback recovery,
+device permission failures, participant sizing, reconnection and cleanup. This
+suite uses a test-only transport and generated media. The opt-in hosted video
+test exercises the real LiveKit transport and checks received audio playback;
+physical microphone/speaker quality still needs two devices.
+
 LiveKit token expiry controls joining, not forced removal of an already connected
 client. The app enforces its own timer and revalidation; immediate provider-enforced
 revocation for a modified client requires a provider-side removal/room-expiry service.

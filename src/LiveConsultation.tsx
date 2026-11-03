@@ -38,6 +38,7 @@ export default function LiveConsultation({
   const containerRef = useRef<HTMLElement>(null),
     local = useRef<HTMLDivElement>(null),
     remote = useRef<HTMLDivElement>(null),
+    remoteAudio = useRef<HTMLDivElement>(null),
     activeRoom = useRef<Room | null>(null);
 
   const [connected, setConnected] = useState(false),
@@ -49,6 +50,8 @@ export default function LiveConsultation({
     [participants, setParticipants] = useState(0),
     [remoteName, setRemoteName] = useState(""),
     [hasRemoteVideo, setHasRemoteVideo] = useState(false),
+    [remoteMicrophone, setRemoteMicrophone] = useState(false),
+    [reconnecting, setReconnecting] = useState(false),
     [isFullscreen, setIsFullscreen] = useState(false);
 
   const l = (en: string, te: string) => localize(lang, en, te);
@@ -87,6 +90,11 @@ export default function LiveConsultation({
       adaptiveStream: true,
       dynacast: true,
       videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+      audioCaptureDefaults: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
     });
     activeRoom.current = room;
 
@@ -112,28 +120,50 @@ export default function LiveConsultation({
 
       if (remotes.length > 0) {
         const first = remotes[0];
-        const rawName = first.name ? first.name.replace(/^Synthetic\s+/i, "").trim() : "";
-        setRemoteName(rawName);
+        setRemoteName(first.name || "");
 
-        const videoTracks = Array.from(first.videoTrackPublications.values()).filter(
-          (pub) => pub.isSubscribed && pub.track,
-        );
+        const videoTracks = Array.from(
+          first.videoTrackPublications.values(),
+        ).filter((pub) => pub.isSubscribed && pub.track && !pub.isMuted);
         setHasRemoteVideo(videoTracks.length > 0);
+        setRemoteMicrophone(
+          Array.from(first.audioTrackPublications.values()).some(
+            (pub) => pub.isSubscribed && pub.track && !pub.isMuted,
+          ),
+        );
       } else {
         setRemoteName("");
         setHasRemoteVideo(false);
+        setRemoteMicrophone(false);
       }
 
       setMicrophone(room.localParticipant.isMicrophoneEnabled);
       setCamera(room.localParticipant.isCameraEnabled);
     };
 
+    const startAudio = async () => {
+      try {
+        await room.startAudio();
+        if (live) setAudioBlocked(!room.canPlaybackAudio);
+      } catch {
+        if (live) setAudioBlocked(true);
+      }
+    };
+
     room
       .on(RoomEvent.TrackSubscribed, (track) => {
         if (!live) return;
         const element = track.attach();
-        if (element instanceof HTMLVideoElement) element.playsInline = true;
-        remote.current?.appendChild(element);
+        element.autoplay = true;
+        if (track.kind === Track.Kind.Audio) {
+          element.muted = false;
+          element.volume = 1;
+          remoteAudio.current?.appendChild(element);
+          void startAudio();
+        } else {
+          if (element instanceof HTMLVideoElement) element.playsInline = true;
+          remote.current?.appendChild(element);
+        }
         update();
       })
       .on(RoomEvent.TrackUnsubscribed, (track) => {
@@ -150,11 +180,39 @@ export default function LiveConsultation({
       })
       .on(RoomEvent.ParticipantConnected, update)
       .on(RoomEvent.ParticipantDisconnected, update)
+      .on(RoomEvent.TrackMuted, update)
+      .on(RoomEvent.TrackUnmuted, update)
+      .on(RoomEvent.ParticipantNameChanged, update)
+      .on(RoomEvent.Reconnecting, () => {
+        if (!live) return;
+        setReconnecting(true);
+        setConnected(false);
+      })
+      .on(RoomEvent.Reconnected, () => {
+        if (!live) return;
+        setReconnecting(false);
+        setConnected(true);
+        update();
+        void startAudio();
+      })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         if (live) setAudioBlocked(!room.canPlaybackAudio);
       })
       .on(RoomEvent.Disconnected, () => {
-        if (live) setConnected(false);
+        if (!live) return;
+        setConnected(false);
+        setReconnecting(false);
+        setParticipants(0);
+        setHasRemoteVideo(false);
+        setRemoteMicrophone(false);
+        setError(
+          (previous) =>
+            previous ||
+            localize(
+              lang,
+              "Call disconnected. Close this window and join again.",
+            ),
+        );
       });
 
     void (async () => {
@@ -165,15 +223,23 @@ export default function LiveConsultation({
           return;
         }
         setConnected(true);
-        try {
-          await room.localParticipant.enableCameraAndMicrophone();
-        } catch {
+        void startAudio();
+        // Start each device independently so a camera failure cannot silence the microphone.
+        const devices = await Promise.allSettled([
+          room.localParticipant.setMicrophoneEnabled(true),
+          room.localParticipant.setCameraEnabled(true),
+        ]);
+        if (devices.some((result) => result.status === "rejected")) {
           if (live)
             setError(
               localize(
                 lang,
-                "Camera/microphone could not start. Check permissions and use the controls below to retry.",
-                "కెమెరా/మైక్ ప్రారంభించలేకపోయాము. అనుమతులు తనిఖీ చేసి కింద ఉన్న బటన్లతో మళ్లీ ప్రయత్నించండి.",
+                devices[0].status === "rejected"
+                  ? "Your microphone could not start. Allow microphone access in your browser, then select Unmute mic."
+                  : "Your camera could not start. Allow camera access in your browser, then select Turn camera on. Your microphone can still be used.",
+                devices[0].status === "rejected"
+                  ? "మీ మైక్ ప్రారంభం కాలేదు. బ్రౌజర్‌లో మైక్ అనుమతి ఇచ్చి మైక్ ప్రారంభించండి ఎంచుకోండి."
+                  : "మీ కెమెరా ప్రారంభం కాలేదు. బ్రౌజర్‌లో కెమెరా అనుమతి ఇచ్చి కెమెరా ప్రారంభించండి ఎంచుకోండి. మైక్ ఉపయోగించవచ్చు.",
               ),
             );
         }
@@ -248,8 +314,21 @@ export default function LiveConsultation({
       void room.disconnect(true);
       local.current?.replaceChildren();
       remote.current?.replaceChildren();
+      remoteAudio.current?.replaceChildren();
     };
   }, [access, appointmentId, lang]);
+
+  async function enableAudio() {
+    const room = activeRoom.current;
+    if (!room) return;
+    try {
+      // Keep this call directly in the click handler to unlock browser audio playback.
+      await room.startAudio();
+      setAudioBlocked(!room.canPlaybackAudio);
+    } catch {
+      setAudioBlocked(true);
+    }
+  }
 
   async function toggle(kind: "microphone" | "camera") {
     const room = activeRoom.current;
@@ -281,7 +360,10 @@ export default function LiveConsultation({
     ? userRole === "specialist"
       ? l("Specialist Doctor (You)", "స్పెషలిస్ట్ డాక్టర్ (మీరు)")
       : l("Medical Officer · Doctor (You)", "మెడికల్ ఆఫీసర్ · డాక్టర్ (మీరు)")
-    : l("Community Health Worker & Patient (You)", "ఫీల్డ్ హెల్త్ వర్కర్ & రోగి (మీరు)");
+    : l(
+        "Community Health Worker & Patient (You)",
+        "ఫీల్డ్ హెల్త్ వర్కర్ & రోగి (మీరు)",
+      );
 
   // Determine remote participant clinical label
   const defaultRemoteTitle = isHealthWorker
@@ -301,8 +383,12 @@ export default function LiveConsultation({
           <span className={`status-pill ${connected ? "online" : "offline"}`}>
             <span className="pulse-dot" />
             {connected
-              ? l("Connected", "అనుసంధానమైంది")
-              : l("Connecting…", "కనెక్ట్ అవుతోంది…")}
+              ? l("Connected · Live call", "అనుసంధానమైంది · లైవ్ కాల్")
+              : reconnecting
+                ? l("Reconnecting…", "మళ్లీ కనెక్ట్ అవుతోంది…")
+                : error
+                  ? l("Disconnected", "కనెక్షన్ ఆగిపోయింది")
+                  : l("Connecting…", "కనెక్ట్ అవుతోంది…")}
           </span>
           <span className="status-separator">·</span>
           <span className="privacy-badge">
@@ -320,6 +406,15 @@ export default function LiveConsultation({
           {localize(lang, error)}
         </p>
       )}
+      <div ref={remoteAudio} className="consultation-audio" />
+      {audioBlocked && (
+        <p className="consultation-audio-notice" role="status">
+          {l(
+            "Call sound is blocked. Select Enable call audio below to hear the other participant.",
+            "కాల్ శబ్దం ఆపబడింది. వినడానికి కింద కాల్ ఆడియో ప్రారంభించండి ఎంచుకోండి.",
+          )}
+        </p>
+      )}
 
       <div className="consultation-grid">
         {/* Remote Tile (Main Focus: Specialist Doctor or Patient Video) */}
@@ -328,25 +423,36 @@ export default function LiveConsultation({
             <span className="tile-title-badge">
               {participants > 0 ? (
                 <>
-                  <span className="live-indicator-dot online" aria-hidden="true" />
+                  <span
+                    className="live-indicator-dot online"
+                    aria-hidden="true"
+                  />
                   <strong className="participant-role-name">
                     👨‍⚕️ {remoteDisplayTitle}
                   </strong>
                 </>
               ) : (
                 <>
-                  <span className="live-indicator-dot waiting" aria-hidden="true" />
+                  <span
+                    className="live-indicator-dot waiting"
+                    aria-hidden="true"
+                  />
                   <strong className="participant-role-name">
                     {isHealthWorker
                       ? l("👨‍⚕️ Specialist Doctor", "👨‍⚕️ స్పెషలిస్ట్ డాక్టర్")
-                      : l("🏥 Health Worker & Patient", "🏥 ఫీల్డ్ హెల్త్ వర్కర్ & రోగి")}
+                      : l(
+                          "🏥 Health Worker & Patient",
+                          "🏥 ఫీల్డ్ హెల్త్ వర్కర్ & రోగి",
+                        )}
                   </strong>
                 </>
               )}
             </span>
             <span className="tile-subbadge">
               {participants > 0
-                ? l("Live Clinical Video", "లైవ్ క్లినికల్ వీడియో")
+                ? hasRemoteVideo
+                  ? l("Live video", "లైవ్ వీడియో")
+                  : l("Camera off", "కెమెరా ఆఫ్")
                 : l("Awaiting Join", "చేరడం కోసం వేచి ఉంది")}
             </span>
           </div>
@@ -357,48 +463,74 @@ export default function LiveConsultation({
               <div className="consultation-waiting-state">
                 <div className="radar-spinner" aria-hidden="true" />
                 <h4 className="waiting-heading">
-                  {isHealthWorker
+                  {participants > 0
                     ? l(
-                        "Waiting for Specialist Doctor to join…",
-                        "స్పెషలిస్ట్ డాక్టర్ చేరడం కోసం వేచి ఉంది…",
+                        "Participant's camera is off",
+                        "పాల్గొనేవారి కెమెరా ఆఫ్‌లో ఉంది",
                       )
-                    : l(
-                        patientName
-                          ? `Waiting for Health Worker & ${patientName}…`
-                          : "Waiting for Health Worker & Patient to join…",
-                        patientName
-                          ? `హెల్త్ వర్కర్ & ${patientName} చేరడం కోసం వేచి ఉంది…`
-                          : "హెల్త్ వర్కర్ మరియు రోగి చేరడం కోసం వేచి ఉంది…",
-                      )}
+                    : isHealthWorker
+                      ? l(
+                          "Waiting for Specialist Doctor to join…",
+                          "స్పెషలిస్ట్ డాక్టర్ చేరడం కోసం వేచి ఉంది…",
+                        )
+                      : l(
+                          patientName
+                            ? `Waiting for Health Worker & ${patientName}…`
+                            : "Waiting for Health Worker & Patient to join…",
+                          patientName
+                            ? `హెల్త్ వర్కర్ & ${patientName} చేరడం కోసం వేచి ఉంది…`
+                            : "హెల్త్ వర్కర్ మరియు రోగి చేరడం కోసం వేచి ఉంది…",
+                        )}
                 </h4>
                 <p className="waiting-subtext">
-                  {isHealthWorker
+                  {participants > 0
                     ? l(
-                        "The oral specialist has been paged. Please position the intraoral camera and patient comfortably.",
-                        "నోటి స్పెషలిస్ట్‌కు సమాచారం వెళ్ళింది. దయచేసి నోటి కెమెరా మరియు రోగిని సౌకర్యవంతంగా సిద్ధంగా ఉంచండి.",
+                        "You can continue speaking while their camera is off.",
+                        "వారి కెమెరా ఆఫ్‌లో ఉన్నా మాట్లాడవచ్చు.",
                       )
-                    : l(
-                        "Community health worker is preparing the live intraoral camera view at the health center.",
-                        "హెల్త్ సెంటర్‌లో ఫీల్డ్ వర్కర్ రోగితో కలిసి నోటి కెమెరా వీక్షణను సిద్ధం చేస్తున్నారు.",
-                      )}
+                    : isHealthWorker
+                      ? l(
+                          "The other participant must join this appointment from their device.",
+                          "ఇతర పాల్గొనేవారు వారి పరికరం నుండి ఈ అపాయింట్‌మెంట్‌లో చేరాలి.",
+                        )
+                      : l(
+                          "The health worker must join this appointment from their device.",
+                          "హెల్త్ వర్కర్ వారి పరికరం నుండి ఈ అపాయింట్‌మెంట్‌లో చేరాలి.",
+                        )}
                 </p>
-                <div className="waiting-auto-hint">
-                  ✓ {l("Audio and high-definition video will stream automatically upon entry.", "డాక్టర్ చేరిన వెంటనే ఆడియో మరియు వీడియో ఆటోమేటిక్‌గా ప్రారంభమవుతాయి.")}
-                </div>
               </div>
             )}
           </div>
+          {participants > 0 && (
+            <p className="consultation-remote-audio-status" role="status">
+              {remoteMicrophone ? <Mic size={14} /> : <MicOff size={14} />}
+              {remoteMicrophone
+                ? l(
+                    "Participant microphone on",
+                    "పాల్గొనేవారి మైక్ ఆన్‌లో ఉంది",
+                  )
+                : l(
+                    "Participant microphone off — ask them to unmute",
+                    "పాల్గొనేవారి మైక్ ఆఫ్‌లో ఉంది — ఆన్ చేయమని అడగండి",
+                  )}
+            </p>
+          )}
         </div>
 
         {/* Local Tile (Self View) */}
         <div className="consultation-tile consultation-tile-local">
           <div className="consultation-tile-header">
             <span className="tile-title-badge">
-              <span className={`live-indicator-dot ${camera ? "online" : "muted"}`} aria-hidden="true" />
+              <span
+                className={`live-indicator-dot ${camera ? "online" : "muted"}`}
+                aria-hidden="true"
+              />
               <span>{localRoleBadge}</span>
             </span>
             <span className="tile-subbadge">
-              {camera ? l("Camera On", "కెమెరా ఆన్") : l("Camera Off", "కెమెరా ఆఫ్")}
+              {camera
+                ? l("Camera On", "కెమెరా ఆన్")
+                : l("Camera Off", "కెమెరా ఆఫ్")}
             </span>
           </div>
 
@@ -453,16 +585,19 @@ export default function LiveConsultation({
           </span>
         </button>
 
-        {audioBlocked && (
-          <button
-            type="button"
-            className="button primary"
-            onClick={() => void activeRoom.current?.startAudio()}
-          >
-            <Volume2 size={16} />
-            <span>{l("Enable call audio", "కాల్ శబ్దం ప్రారంభించండి")}</span>
-          </button>
-        )}
+        <button
+          type="button"
+          className={`button ${audioBlocked ? "primary" : "secondary"}`}
+          disabled={!connected}
+          onClick={() => void enableAudio()}
+        >
+          <Volume2 size={16} />
+          <span>
+            {audioBlocked
+              ? l("Enable call audio", "కాల్ శబ్దం ప్రారంభించండి")
+              : l("Check call audio", "కాల్ శబ్దం తనిఖీ చేయండి")}
+          </span>
+        </button>
 
         <button
           type="button"
