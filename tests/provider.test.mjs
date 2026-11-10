@@ -306,6 +306,21 @@ test("Gemini distinguishes exhausted deadlines, body timeouts and persistent con
   assert.equal(calls, 2);
 });
 
+test("oral observations use the verified default independently of legacy model configuration", () => {
+  const legacy = harness({
+    SCREENING_AI_MODE: "gemini",
+    GEMINI_API_KEY: "fixture-key",
+    GEMINI_MODEL: "gemini-3.8-flash",
+  });
+  assert.equal(legacy.services.status().ai_model, "gemini-3.5-flash-lite");
+  const explicit = harness({
+    SCREENING_AI_MODE: "gemini",
+    GEMINI_API_KEY: "fixture-key",
+    ORAL_OBSERVATION_MODEL: "gemini-explicit-model",
+  });
+  assert.equal(explicit.services.status().ai_model, "gemini-explicit-model");
+});
+
 test("Gemini receives only image data and returns persisted observations without a fabricated score", async () => {
   const h = harness(
     { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "synthetic-gemini-key" },
@@ -326,6 +341,7 @@ test("Gemini receives only image data and returns persisted observations without
   assert.equal(result.requires_clinician_review, true);
   const call = h.calls[0];
   assert.ok(call.url.endsWith(":generateContent"));
+  assert.ok(call.url.includes("/models/gemini-3.5-flash-lite:"));
   assert.ok(!call.url.includes("synthetic-gemini-key"));
   assert.equal(call.options.headers["x-goog-api-key"], "synthetic-gemini-key");
   assert.equal(

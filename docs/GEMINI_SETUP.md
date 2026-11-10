@@ -20,7 +20,7 @@ In the ignored `.env.server` file in the project root, set:
 ```dotenv
 SCREENING_AI_MODE=gemini
 GEMINI_API_KEY=YOUR_PRIVATE_GEMINI_KEY
-GEMINI_MODEL=gemini-3.5-flash-lite
+ORAL_OBSERVATION_MODEL=gemini-3.5-flash-lite
 ```
 
 The deployed default uses the model previously verified with this project.
@@ -82,7 +82,7 @@ An exhausted deadline returns a timeout message; a persistent connection failure
 returns a separate hosting-connection message. Neither saves an analysis result.
 
 If the hosted failure persists, check Render logs and Google's API status;
-verify `GEMINI_API_KEY` and `GEMINI_MODEL` in that service's environment. Where
+verify `GEMINI_API_KEY` and `ORAL_OBSERVATION_MODEL` in that service's environment. Where
 service shell access is available, run `npm run ai:check` there to test that
 deployment's configuration using a generated checkerboard without sending a
 patient photograph. Do not paste keys into logs or chat. A model change remains

@@ -45,7 +45,12 @@ Unrun analyses no longer display an empty model-score panel.
 
 Keep the existing server-side Gemini credentials and `SCREENING_AI_MODE=gemini`
 for observation-based evaluation. Confirm the provider connection with
-`npm run ai:check`. Keep both exact custom domains in Render's `APP_ORIGINS`:
+`npm run ai:check`. The observation workflow defaults to the verified
+`gemini-3.5-flash-lite`, independently of legacy `GEMINI_MODEL` settings.
+Set `ORAL_OBSERVATION_MODEL` to explicitly choose a different observation model;
+there is no automatic substitution after a failure. `/api/status` reports the
+active `ai_model` without revealing credentials. Keep both exact custom domains
+in Render's `APP_ORIGINS`:
 
 ```text
 https://aarogyadrishti.in,https://www.aarogyadrishti.in

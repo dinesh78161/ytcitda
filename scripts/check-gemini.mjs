@@ -22,7 +22,7 @@ if (!process.env.GEMINI_API_KEY?.trim()) {
     const result = await analyzeWithGemini({
       bytes: jpeg.encode({ data, width, height }, 85).data,
       key: process.env.GEMINI_API_KEY,
-      model: process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
+      model: process.env.ORAL_OBSERVATION_MODEL || GEMINI_DEFAULT_MODEL,
     });
     if (result.findings.image_kind === "oral_photo")
       throw new Error(

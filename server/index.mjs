@@ -56,10 +56,12 @@ export function createServices(
     : null;
   const aiMode =
     env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
+  // Oral observations have an explicit model setting, independent of legacy
+  // GEMINI_MODEL values left on the host for older analysis workflows.
   const visionModel =
-    env.GEMINI_MODEL ||
-    env.MEDGEMMA_MODEL ||
-    (aiMode === "medgemma" ? MEDGEMMA_DEFAULT_MODEL : GEMINI_DEFAULT_MODEL);
+    aiMode === "gemini"
+      ? env.ORAL_OBSERVATION_MODEL || GEMINI_DEFAULT_MODEL
+      : env.GEMINI_MODEL || env.MEDGEMMA_MODEL || MEDGEMMA_DEFAULT_MODEL;
   requireValue(
     [
       "mock",
