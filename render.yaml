@@ -12,6 +12,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: APP_ORIGINS
+        value: https://aarogyadrishti.in,https://www.aarogyadrishti.in
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY

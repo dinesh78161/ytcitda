@@ -61,12 +61,31 @@ export async function checkDeployment(base) {
       404,
       `${path} must not be served`,
     );
-  const unauthorized = await request("/api/upload", {
+  for (const path of ["/api/upload", "/api/analyze", "/api/video"]) {
+    const unauthorized = await request(path, {
+      method: "POST",
+      headers: { Origin: base, "Content-Type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(
+      unauthorized.status,
+      401,
+      `${path} must accept the deployment origin and require sign-in`,
+    );
+  }
+  const foreignOrigin = await request("/api/analyze", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Origin: "https://untrusted.invalid",
+      "Content-Type": "application/json",
+    },
     body: "{}",
   });
-  assert.equal(unauthorized.status, 401, "Anonymous uploads must fail");
+  assert.equal(
+    foreignOrigin.status,
+    403,
+    "Foreign origins must remain blocked",
+  );
   const manifest = await request("/manifest.webmanifest");
   assert.equal(manifest.status, 200);
   assert.ok((await manifest.json()).icons?.length, "PWA must declare icons");

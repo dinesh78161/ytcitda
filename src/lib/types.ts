@@ -87,6 +87,8 @@ export interface Analysis {
     language?: Language;
     prompt_version: string;
     image_kind: "oral_photo" | "not_oral_photo" | "uncertain";
+    oral_assessment?:
+      "no_visible_abnormality" | "visible_changes" | "not_assessable";
     summary: string;
     visible_findings: string[];
     possible_conditions: { name: string; visual_basis: string }[];

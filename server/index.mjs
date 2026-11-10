@@ -498,6 +498,11 @@ export function createServices(
       };
     }
     if (path === "/api/analyze") {
+      requireValue(
+        body.engine === undefined || body.engine === "bundled_oral",
+        400,
+        "Select a supported image analysis engine.",
+      );
       const useLocalModel =
         aiMode === "local" || body.engine === "bundled_oral";
       requireValue(
@@ -604,6 +609,12 @@ export function createServices(
         409,
         "Retake this image before analysis.",
       );
+      if (useLocalModel)
+        requireValue(
+          body.lesion_confirmed === true,
+          400,
+          "The bundled classifier only evaluates visible lesions. Confirm a visible lesion or use image observations for general oral photographs.",
+        );
       let result;
       if (aiMode === "mock" && !useLocalModel) {
         result = {
@@ -782,6 +793,12 @@ export function createApi(services, env = process.env, { staticDir } = {}) {
   );
   if (env.RENDER_EXTERNAL_URL)
     origins.add(new URL(env.RENDER_EXTERNAL_URL).origin);
+  if (env.NODE_ENV === "production") {
+    // These are this application's public domains. Render only supplies its
+    // onrender.com URL, so custom-domain POSTs need explicit trusted origins.
+    origins.add("https://aarogyadrishti.in");
+    origins.add("https://www.aarogyadrishti.in");
+  }
   const counts = new Map();
   return createServer(async (req, res) => {
     res.setHeader("Content-Type", "application/json; charset=utf-8");

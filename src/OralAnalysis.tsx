@@ -18,13 +18,16 @@ import { isCloud, isClinical } from "./lib/client";
 import { careApi, downloadUrl } from "./lib/services";
 import type { OralImage } from "./lib/types";
 import { hasConsent } from "./lib/care-workflows";
+import { assessMedGemmaQuality } from "./lib/image-quality";
 
 export default function OralAnalysis({
   image,
   consent,
+  onRetake,
 }: {
   image: OralImage;
   consent: boolean;
+  onRetake?: () => void;
 }) {
   const { w, t, lang, run } = useApp();
   const copy = (en: string, te: string) => localize(lang, en, te);
@@ -32,6 +35,7 @@ export default function OralAnalysis({
   const [previewError, setPreviewError] = useState(false),
     [previewAttempt, setPreviewAttempt] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
+  const [visibleLesion, setVisibleLesion] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
   const clinicalRole = ["medical_officer", "specialist"].includes(
     w.profile?.role || "",
@@ -48,7 +52,10 @@ export default function OralAnalysis({
   const localMode =
     !isClinical &&
     (w.services.ai_provider === "local" ||
-      w.services.oral_model_ready === true);
+      (w.services.oral_model_ready === true &&
+        !["gemini", "medgemma", "research"].includes(
+          w.services.ai_provider || "",
+        )));
   const clinicalAvailable =
     isClinical &&
     w.services.ai &&
@@ -93,6 +100,17 @@ export default function OralAnalysis({
     : !isCloud || (!localMode && w.services.ai_provider === "mock");
   const good = image.quality_status === "acceptable";
   const quality = image.quality_details;
+  const captureGuidance =
+    quality &&
+    typeof quality.sharpness === "number" &&
+    typeof quality.brightness === "number" &&
+    typeof quality.glare_percent === "number"
+      ? assessMedGemmaQuality({
+          sharpness: quality.sharpness,
+          brightness: quality.brightness,
+          glare_percent: quality.glare_percent,
+        })
+      : null;
   const score =
     !mock &&
     result?.score !== null &&
@@ -109,7 +127,9 @@ export default function OralAnalysis({
         w.execute("analyze", {
           image_id: image.id,
           language: lang,
-          ...(localMode ? { engine: "bundled_oral" } : {}),
+          ...(localMode
+            ? { engine: "bundled_oral", lesion_confirmed: visibleLesion }
+            : {}),
         }),
       );
     } finally {
@@ -138,21 +158,34 @@ export default function OralAnalysis({
     typeof quality?.[key] === "number" ? `${quality[key]}${unit}` : "—";
 
   const conditionTitle =
-    findings?.image_kind === "oral_photo"
-      ? findings.possible_conditions[0]?.name || findings.visible_findings[0]
-      : consent && result && !mock && !visionResult
-        ? result.research_label === "benign_lesion"
-          ? copy(
-              "Model classification: benign lesion",
-              "మోడల్ వర్గీకరణ: నిరపాయమైన గాయం",
-            )
-          : result.research_label === "malignant_lesion"
-            ? copy(
-                "Model classification: malignant lesion",
-                "మోడల్ వర్గీకరణ: ప్రాణాంతక గాయం",
-              )
-            : null
-        : null;
+    findings?.oral_assessment === "no_visible_abnormality"
+      ? copy(
+          "No visible abnormality in this photo",
+          "ఈ ఫోటోలో కనిపించే అసాధారణత లేదు",
+        )
+      : findings?.oral_assessment === "visible_changes"
+        ? copy(
+            "Visible changes — clinician review needed",
+            "కనిపించే మార్పులు — వైద్య సమీక్ష అవసరం",
+          )
+        : findings?.oral_assessment === "not_assessable"
+          ? copy("Photo cannot be assessed", "ఫోటోను అంచనా వేయలేము")
+          : findings?.image_kind === "oral_photo"
+            ? findings.possible_conditions[0]?.name ||
+              findings.visible_findings[0]
+            : consent && result && !mock && !visionResult
+              ? result.research_label === "benign_lesion"
+                ? copy(
+                    "Model classification: benign lesion",
+                    "మోడల్ వర్గీకరణ: నిరపాయమైన గాయం",
+                  )
+                : result.research_label === "malignant_lesion"
+                  ? copy(
+                      "Model classification: malignant lesion",
+                      "మోడల్ వర్గీకరణ: ప్రాణాంతక గాయం",
+                    )
+                  : null
+              : null;
 
   return (
     <article
@@ -315,6 +348,36 @@ export default function OralAnalysis({
             </div>
           ))}
         </dl>
+        {!good && (
+          <div className="form-notice" role="status">
+            <p>
+              {captureGuidance
+                ? lang === "te"
+                  ? captureGuidance.recommendation_te
+                  : captureGuidance.recommendation
+                : copy(
+                    "Retake a close, well-lit photograph of the inside of the mouth. Hold steady and tap to focus on the tissue.",
+                    "నోటి లోపలి భాగాన్ని దగ్గరగా, మంచి వెలుతురులో మళ్లీ తీయండి. కదలకుండా పట్టుకొని కణజాలంపై ఫోకస్ చేయండి.",
+                  )}
+            </p>
+            <p className="small muted">
+              {copy(
+                "This checks photo quality, not whether the person is healthy.",
+                "ఇది ఫోటో నాణ్యతను పరీక్షిస్తుంది, వ్యక్తి ఆరోగ్యాన్ని కాదు.",
+              )}
+            </p>
+            {onRetake && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={onRetake}
+              >
+                <Camera size={16} />
+                {copy("Retake oral photo", "నోటి ఫోటో మళ్లీ తీయండి")}
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <section
         className="analysis-findings"
@@ -368,7 +431,7 @@ export default function OralAnalysis({
                           "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
                           "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
                         )
-                      : visionResult
+                      : visionResult || (!result && geminiMode)
                         ? copy(
                             "GEMINI · RESEARCH ONLY",
                             "జెమిని · పరిశోధన కోసం మాత్రమే",
@@ -380,6 +443,27 @@ export default function OralAnalysis({
             </div>
 
             {/* Top action button: prominent and visible without scrolling */}
+            {geminiMode && result?.model_version === "oral-mendeley-v1" && (
+              <p className="form-notice" role="status">
+                {copy(
+                  "This saved result used a two-class lesion model that cannot assess a healthy mouth. Re-analyse this photo to obtain image observations.",
+                  "ఈ ఫలితం ఆరోగ్యకరమైన నోటిని అంచనా వేయలేని రెండు వర్గాల గాయాల మోడల్ నుండి వచ్చింది. చిత్ర పరిశీలనల కోసం మళ్లీ విశ్లేషించండి.",
+                )}
+              </p>
+            )}
+            {localMode && (
+              <label className="form-notice">
+                <input
+                  type="checkbox"
+                  checked={visibleLesion}
+                  onChange={(event) => setVisibleLesion(event.target.checked)}
+                />
+                {copy(
+                  "A visible lesion is present in this photo. The two-class model cannot assess a healthy mouth.",
+                  "ఈ ఫోటోలో కనిపించే గాయం ఉంది. రెండు వర్గాల మోడల్ ఆరోగ్యకరమైన నోటిని అంచనా వేయలేదు.",
+                )}
+              </label>
+            )}
             {(!result || researchAvailable) && (
               <div className="analysis-action-bar-top">
                 <button
@@ -391,6 +475,7 @@ export default function OralAnalysis({
                     !consent ||
                     !aiConsent ||
                     !good ||
+                    (localMode && !visibleLesion) ||
                     (isCloud && !w.services.ai && !localMode)
                   }
                   onClick={() => void analyze()}
@@ -426,7 +511,7 @@ export default function OralAnalysis({
                                     "జెమినితో మళ్లీ విశ్లేషించండి",
                                   )
                                 : copy(
-                                    "Analyse with Gemini",
+                                    "Analyse oral photograph",
                                     "జెమినితో విశ్లేషించండి",
                                   )
                               : copy(
@@ -499,7 +584,7 @@ export default function OralAnalysis({
                             "చిత్ర విశ్లేషణకు సిద్ధం",
                           )}
                 </h4>
-                {!isClinical && !visionResult && (
+                {result && !isClinical && !visionResult && (
                   <div className="analysis-score">
                     <span>
                       {copy("Model class score", "మోడల్ వర్గ స్కోర్")}

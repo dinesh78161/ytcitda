@@ -118,6 +118,7 @@ try {
   const result = await call("/api/analyze", {
     image_id: fixture.image_id,
     engine: "bundled_oral",
+    lesion_confirmed: true,
     language: "en",
   });
   assert.equal(result.model_version, "oral-mendeley-v1");

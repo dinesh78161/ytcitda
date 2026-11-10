@@ -202,7 +202,19 @@ const geminiResponse = (report = geminiReport()) =>
     candidates: [
       {
         finishReason: "STOP",
-        content: { parts: [{ text: JSON.stringify(report) }] },
+        content: {
+          parts: [
+            {
+              text: JSON.stringify({
+                oral_assessment:
+                  report.image_kind === "oral_photo"
+                    ? "visible_changes"
+                    : "not_assessable",
+                ...report,
+              }),
+            },
+          ],
+        },
       },
     ],
   });
@@ -325,6 +337,102 @@ test("Gemini receives only image data and returns persisted observations without
     h.writes.find((w) => w.table === "ai_analyses").value.findings,
     result.findings,
   );
+});
+
+test("no-visible-abnormality assessments persist for either photo source without a lesion label or score", async () => {
+  for (const source of ["camera", "file_upload"]) {
+    let localCalls = 0;
+    const h = harness(
+      { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "fixture-key" },
+      () =>
+        geminiResponse({
+          ...geminiReport(),
+          oral_assessment: "no_visible_abnormality",
+          summary:
+            "No visible abnormality in the photographed area. This does not exclude disease.",
+          visible_findings: [],
+          possible_conditions: [],
+        }),
+      {
+        localModel: {
+          status: () => ({ ready: true, model_version: "oral-mendeley-v1" }),
+          infer: () => {
+            localCalls++;
+            throw new Error("The two-class model must not run");
+          },
+        },
+      },
+    );
+    const result = await h.services.handle(
+      "/api/analyze",
+      { image_id: h.image, source },
+      h.ctx,
+    );
+    assert.equal(result.research_label, "no_visible_abnormality");
+    assert.equal(result.findings.oral_assessment, "no_visible_abnormality");
+    assert.equal(result.score, null);
+    assert.deepEqual(result.findings.possible_conditions, []);
+    assert.equal(localCalls, 0);
+    assert.equal(
+      h.writes.find((w) => w.table === "ai_analyses").value.research_label,
+      "no_visible_abnormality",
+    );
+    assert.ok(!JSON.stringify(h.calls[0].body.contents).includes(source));
+  }
+});
+
+test("visible changes and unassessable oral images produce separate image-based outcomes", async () => {
+  for (const [changes, label] of [
+    [{ oral_assessment: "visible_changes" }, "visible_changes_review_required"],
+    [
+      {
+        oral_assessment: "not_assessable",
+        visible_findings: [],
+        possible_conditions: [],
+        summary:
+          "The tissue detail is not visible. Retake a close, focused intraoral photo.",
+      },
+      "image_not_assessable",
+    ],
+  ]) {
+    const h = harness(
+      { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "fixture-key" },
+      () => geminiResponse({ ...geminiReport(), ...changes }),
+    );
+    const result = await h.services.handle(
+      "/api/analyze",
+      { image_id: h.image },
+      h.ctx,
+    );
+    assert.equal(result.research_label, label);
+    assert.equal(result.score, null);
+  }
+});
+
+test("contradictory, missing or unsupported oral assessments are never saved", async () => {
+  for (const changes of [
+    { oral_assessment: "no_visible_abnormality" },
+    { oral_assessment: "visible_changes", visible_findings: [] },
+    { oral_assessment: "not_assessable" },
+    { oral_assessment: "healthy" },
+    { oral_assessment: undefined },
+    {
+      oral_assessment: "no_visible_abnormality",
+      image_kind: "not_oral_photo",
+      visible_findings: [],
+      possible_conditions: [],
+    },
+  ]) {
+    const h = harness(
+      { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "fixture-key" },
+      () => geminiResponse({ ...geminiReport(), ...changes }),
+    );
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === 502,
+    );
+    assert.equal(h.writes.length, 0);
+  }
 });
 
 test("Gemini uses the selected report language and rejects unknown language input", async () => {
@@ -646,9 +754,14 @@ test("bundled oral model completes authorized image analysis without any externa
       download: async () => ({ data: new Blob([bytes]), error: null }),
     });
     assert.equal(h.services.status().ai_provider, "local");
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === 400 && /visible lesion/.test(e.message),
+    );
+    assert.equal(h.writes.length, 0);
     const result = await h.services.handle(
       "/api/analyze",
-      { image_id: h.image },
+      { image_id: h.image, lesion_confirmed: true },
       h.ctx,
     );
     assert.equal(result.model_version, "oral-mendeley-v1");
@@ -688,7 +801,7 @@ test("an explicitly selected bundled model does not call the configured Gemini p
     assert.equal(h.services.status().oral_model_ready, true);
     const result = await h.services.handle(
       "/api/analyze",
-      { image_id: h.image, engine: "bundled_oral" },
+      { image_id: h.image, engine: "bundled_oral", lesion_confirmed: true },
       h.ctx,
     );
     assert.equal(result.model_version, "oral-mendeley-v1");

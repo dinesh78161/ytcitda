@@ -2065,6 +2065,10 @@ function PatientDetail({
                           key={image.id}
                           image={image}
                           consent={photoConsent}
+                          onRetake={() => {
+                            setOralView(image.oral_view || oralView);
+                            setLiveCameraOpen(true);
+                          }}
                         />
                       ))
                   )}

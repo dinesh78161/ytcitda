@@ -566,7 +566,7 @@ test("photo decoding, retake guidance and nonclinical mock analysis", async ({
   await page
     .getByRole("tab", { name: "Oral photographs", exact: true })
     .click();
-  await expect(page.locator(".analysis-score strong")).toHaveText(["—", "—"]);
+  await expect(page.locator(".analysis-score strong")).toHaveText(["—"]);
   // Persist an explicit server-report fixture to verify rendering, not inference.
   await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {

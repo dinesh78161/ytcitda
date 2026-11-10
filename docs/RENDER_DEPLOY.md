@@ -36,8 +36,9 @@ Clinical mode also requires the matching database policy. Follow
 [clinical activation](CLINICAL_WORKSPACE.md) before introducing patient data.
 The build reads `WORKSPACE_MODE`, so changing it requires rebuilding the frontend.
 Use `WORKSPACE_MODE=evaluation` for the retained research/test workflow.
-Do not copy the local `API_HOST`, `API_PORT` or `APP_ORIGINS` into Render. The server
-listens on `0.0.0.0` and automatically accepts its own Render HTTPS origin.
+Do not copy the local `API_HOST`, `API_PORT` or local `APP_ORIGINS` into Render.
+The server listens on `0.0.0.0` and automatically accepts its Render HTTPS origin
+and the public HTTPS domains `aarogyadrishti.in` and `www.aarogyadrishti.in`.
 
 `npm run build:render` automatically runs `npm test` through `prebuild:render`.
 A failing test stops deployment with the existing build command. GitHub Actions is
@@ -81,8 +82,21 @@ Run `npm run test:deployed -- https://YOUR-SERVICE.onrender.com` after deploymen
 To check the deployed login page in Edge, set `DEPLOY_URL` to that HTTPS origin and
 run `npm run test:production`; this mode does not start a local server.
 
-If you add a custom domain, set `APP_ORIGINS` to its full HTTPS origin. The default
-Render origin remains accepted. Rebuild after changing the Supabase project URL or
+For the current custom domains, set this in Render **Environment** and save/redeploy:
+
+```text
+APP_ORIGINS=https://aarogyadrishti.in,https://www.aarogyadrishti.in
+```
+
+This environment change also fixes older releases that return `Origin not permitted.`
+on photo upload or analysis. The production server now trusts these two exact HTTPS
+origins even when that variable is missing or still contains local development URLs.
+Other custom domains must be explicitly added to `APP_ORIGINS`; use full HTTPS
+origins separated by commas, without paths or trailing slashes. The default
+Render origin remains accepted. Run `npm run test:deployed -- https://aarogyadrishti.in`
+to verify POST origins as well as page loading and authentication.
+
+Rebuild after changing the Supabase project URL or
 publishable key, because these are included in the browser bundle at build time.
 Secrets previously shared or committed must be rotated in Supabase before public use.
 

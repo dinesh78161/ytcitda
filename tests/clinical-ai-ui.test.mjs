@@ -15,6 +15,15 @@ before(async () => {
     appType: "custom",
     server: { middlewareMode: true },
     optimizeDeps: { noDiscovery: true },
+    ssr: {
+      external: [
+        "react",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "react-dom",
+        "lucide-react",
+      ],
+    },
     plugins: [
       react(),
       {

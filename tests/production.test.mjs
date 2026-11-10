@@ -132,6 +132,81 @@ test("production accepts its Render/custom origin and still enforces authenticat
   );
   assert.equal((await post("http://localhost:5174", "test-user")).status, 403);
 });
+test("public custom domains accept uploads, analysis and video without bypassing authentication", async () => {
+  for (const origin of [
+    "https://aarogyadrishti.in",
+    "https://www.aarogyadrishti.in",
+  ]) {
+    for (const path of ["/api/upload", "/api/analyze", "/api/video"]) {
+      const post = (token) =>
+        fetch(base + path, {
+          method: "POST",
+          headers: {
+            Origin: origin,
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: "{}",
+        });
+      assert.equal((await post()).status, 401, `${origin}${path}`);
+      assert.equal((await post("test-user")).status, 200, `${origin}${path}`);
+    }
+  }
+  for (const origin of [
+    "http://aarogyadrishti.in",
+    "https://aarogyadrishti.in.attacker.invalid",
+    "https://attacker.aarogyadrishti.in",
+    "https://vaarogyadrishti.in",
+    "null",
+  ]) {
+    const response = await fetch(base + "/api/analyze", {
+      method: "POST",
+      headers: {
+        Origin: origin,
+        Authorization: "Bearer test-user",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    assert.equal(response.status, 403, origin);
+    assert.equal((await response.json()).error, "Origin not permitted.");
+  }
+});
+
+test("public custom domains work without APP_ORIGINS on Render", async () => {
+  const isolated = createApi(
+    {
+      status: () => ({}),
+      authenticate: async () => {
+        throw new HttpError(401, "Sign in first.");
+      },
+    },
+    {
+      NODE_ENV: "production",
+      RENDER_EXTERNAL_URL: "https://example.onrender.com",
+    },
+  );
+  await new Promise((resolve) => isolated.listen(0, "127.0.0.1", resolve));
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${isolated.address().port}/api/upload`,
+      {
+        method: "POST",
+        headers: {
+          Origin: "https://aarogyadrishti.in",
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      },
+    );
+    assert.equal(response.status, 401);
+    assert.equal((await response.json()).error, "Sign in first.");
+  } finally {
+    isolated.closeAllConnections();
+    await new Promise((resolve) => isolated.close(resolve));
+  }
+});
+
 test("accounts behind the same hosting proxy have independent request limits", async () => {
   const isolated = createApi(
     {
