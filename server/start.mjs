@@ -1,6 +1,7 @@
 import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createApi, createServices } from "./index.mjs";
+import { createLocalOralModel } from "./local-oral-model.mjs";
 
 const dist = new URL("../dist/", import.meta.url);
 await access(new URL("index.html", dist));
@@ -15,7 +16,16 @@ for (const name of [
 const port = Number(process.env.PORT || process.env.API_PORT || 8787);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid server port.");
-const services = createServices();
+const bundledModel =
+  process.env.WORKSPACE_MODE !== "clinical" &&
+  process.env.SCREENING_AI_MODE !== "disabled" &&
+  process.env.BUNDLED_ORAL_MODEL_ENABLED !== "false"
+    ? createLocalOralModel()
+    : null;
+const services = createServices(process.env, undefined, undefined, {
+  localModel: bundledModel,
+});
+await services.ready();
 const server = createApi(services, process.env, {
   staticDir: fileURLToPath(dist),
 });
@@ -36,5 +46,6 @@ for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => {
     clearInterval(timer);
     server.close();
+    void services.close();
     setTimeout(() => process.exit(0), 10000).unref();
   });

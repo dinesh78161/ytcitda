@@ -20,11 +20,18 @@ test("dedicated clinical workspace supports signed real-record workflows without
       grant execute on function auth.uid(),auth.jwt() to anon,authenticated,service_role;
       alter default privileges in schema public grant all on tables to anon,authenticated,service_role;
       create schema storage; create table storage.buckets(id text primary key,name text not null,public boolean,file_size_limit bigint,allowed_mime_types text[]);`);
-    const setup = await readFile(new URL("../supabase/setup.sql", import.meta.url), "utf8");
-    const upgradeStart = setup.indexOf('-- Source: supabase/migrations/202610280006_privileged_mfa.sql');
-    assert.ok(upgradeStart>0);
-    await db.exec(setup.slice(0,upgradeStart)+'\ncommit;');
-    await db.exec(await readFile(new URL('../supabase/seed.sql',import.meta.url),'utf8'));
+    const setup = await readFile(
+      new URL("../supabase/setup.sql", import.meta.url),
+      "utf8",
+    );
+    const upgradeStart = setup.indexOf(
+      "-- Source: supabase/migrations/202610280006_privileged_mfa.sql",
+    );
+    assert.ok(upgradeStart > 0);
+    await db.exec(setup.slice(0, upgradeStart) + "\ncommit;");
+    await db.exec(
+      await readFile(new URL("../supabase/seed.sql", import.meta.url), "utf8"),
+    );
     await db.query("insert into auth.users(id,email) values($1,$2),($3,$4)", [
       worker,
       "worker@clinic.invalid",
@@ -78,7 +85,7 @@ test("dedicated clinical workspace supports signed real-record workflows without
     } finally {
       await resetDb.close();
     }
-    await db.exec('begin;\n'+setup.slice(upgradeStart));
+    await db.exec("begin;\n" + setup.slice(upgradeStart));
     await assert.rejects(
       () =>
         db.exec(
@@ -220,6 +227,125 @@ test("dedicated clinical workspace supports signed real-record workflows without
         (await db.query("select count(*) as n from public.audit_events"))
           .rows[0].n,
       ) > 0,
+    );
+    // Clinical assistance leaves the original research ban intact.
+    assert.equal(
+      (
+        await actor(doctor, () =>
+          db.query(
+            "select public.clinical_image_assistance_policy() as policy",
+          ),
+        )
+      ).rows[0].policy.version,
+      1,
+    );
+    await db.query(
+      "update public.images set quality_status='acceptable' where id=$1",
+      [image],
+    );
+    const clinicalFindings = JSON.stringify({
+      engine: "clinical",
+      image_kind: "oral_photo",
+      summary: "Synthetic draft fixture",
+      visible_findings: [],
+      possible_conditions: [],
+      limitations: ["Fixture only"],
+    });
+    const insertDraft = (permission, requestedBy = doctor, score = null) =>
+      db.query(
+        `insert into public.ai_analyses(image_id,provider,model_version,status,research_label,findings,requested_by,assistance_consent_id,warning,score)
+       values($1,'clinical_assistance','clinical-fixture-v1','completed','clinician_assistance_draft',$2::jsonb,$3,$4,'AI DRAFT - CLINICIAN REVIEW REQUIRED',$5) returning id`,
+        [image, clinicalFindings, requestedBy, permission, score],
+      );
+    await assert.rejects(
+      () => insertDraft(consent),
+      (e) => e.code === "23514",
+    );
+    await actor(worker, () =>
+      rpc("consent", {
+        patient_id: person,
+        purpose: "ai_assistance",
+        granted: true,
+        language: "en",
+      }),
+    );
+    const aiPermission = (
+      await db.query(
+        "select id from public.consents where purpose='ai_assistance' order by recorded_at desc limit 1",
+      )
+    ).rows[0].id;
+    await assert.rejects(
+      () => insertDraft(aiPermission, worker),
+      (e) => e.code === "23514",
+    );
+    await assert.rejects(
+      () => insertDraft(aiPermission, doctor, 0.99),
+      (e) => e.code === "23514",
+    );
+    const draft = (await insertDraft(aiPermission)).rows[0].id;
+    assert.equal(
+      (
+        await db.query(
+          "select actor_id from public.audit_events where action='CLINICIAN_ASSISTANCE_DRAFT' and resource_id=$1",
+          [draft],
+        )
+      ).rows[0].actor_id,
+      doctor,
+    );
+    assert.equal(
+      (
+        await actor(doctor, () =>
+          db.query("select id from public.ai_analyses where id=$1", [draft]),
+        )
+      ).rows.length,
+      1,
+    );
+    assert.equal(
+      (
+        await actor(
+          doctor,
+          () =>
+            db.query("select id from public.ai_analyses where id=$1", [draft]),
+          "aal1",
+        )
+      ).rows.length,
+      0,
+    );
+    assert.equal(
+      (
+        await actor(worker, () =>
+          db.query("select id from public.ai_analyses where id=$1", [draft]),
+        )
+      ).rows.length,
+      0,
+    );
+    await assert.rejects(
+      () =>
+        db.query(
+          "update public.ai_analyses set model_version='edited' where id=$1",
+          [draft],
+        ),
+      (e) => e.code === "55000",
+    );
+    await actor(worker, () =>
+      rpc("consent", {
+        patient_id: person,
+        purpose: "ai_assistance",
+        granted: false,
+        language: "en",
+      }),
+    );
+    await assert.rejects(
+      () => insertDraft(aiPermission),
+      (e) => e.code === "23514",
+    );
+    await assert.rejects(
+      () =>
+        db.query(
+          "insert into public.ai_analyses(image_id,provider,model_version,status) values($1,'research','fixture','completed')",
+          [image],
+        ),
+      (e) => e.code === "23514",
     );
   } finally {
     await db.close();

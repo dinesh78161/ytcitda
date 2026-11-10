@@ -10,11 +10,14 @@ from pathlib import Path
 
 FIELDS = ["image_path", "patient_id", "label", "label_basis", "source", "license"]
 SPLITS = ("train", "validation", "test")
+SPLIT_FIELDS = FIELDS + ["image_sha256", "pixel_sha256", "split", "split_unit"]
 
 
-def audit_manifest(manifest):
+def audit_manifest(manifest, split_unit="patient"):
     from PIL import Image, ImageOps
 
+    if split_unit not in {"patient", "image"}:
+        raise ValueError("Split unit must be patient or image.")
     manifest = Path(manifest).resolve()
     with manifest.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -25,11 +28,14 @@ def audit_manifest(manifest):
         raise ValueError("The manifest is empty.")
     fingerprints = set()
     for row in rows:
-        if any(not str(row.get(k, "")).strip() for k in FIELDS):
+        required = [k for k in FIELDS if k != "patient_id" or split_unit == "patient"]
+        if any(not str(row.get(k) or "").strip() for k in required):
             raise ValueError("Every original image needs a subject, verified label, source, and license.")
+        for key in FIELDS:
+            row[key] = str(row.get(key) or "").strip()
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,79}", row["label"]):
             raise ValueError("Use lowercase machine-readable labels, such as benign_lesion.")
-        if row["patient_id"].strip().lower() in {"unknown", "n/a", "none"}:
+        if split_unit == "patient" and row["patient_id"].lower() in {"unknown", "n/a", "none"}:
             raise ValueError("Patient grouping is required; do not invent one subject per photo.")
         path = (manifest.parent / row["image_path"]).resolve()
         if path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
@@ -52,6 +58,31 @@ def audit_manifest(manifest):
     return rows
 
 
+def split_images(rows, seed=42):
+    """Exploratory stratified split; never claim patient independence."""
+    # If grouping is known, use the stronger patient workflow instead.
+    if any(row.get("patient_id", "").strip() for row in rows):
+        raise ValueError("Patient IDs are present. Use the patient split workflow.")
+    assigned = []
+    for label in sorted({r["label"] for r in rows}):
+        candidates = sorted((r for r in rows if r["label"] == label), key=lambda r: r["pixel_sha256"])
+        if len(candidates) < 3:
+            raise ValueError("Need at least three original images per class.")
+        random.Random(seed).shuffle(candidates)
+        n = max(1, round(len(candidates) * 0.15))
+        for i, row in enumerate(candidates):
+            assigned.append({**row, "split": "test" if i < n else "validation" if i < 2 * n else "train", "split_unit": "image"})
+    verify_splits(assigned, "image")
+    return assigned
+
+
+def manifest_split_unit(rows):
+    units = {r.get("split_unit") or "patient" for r in rows}
+    if len(units) != 1 or not units.issubset({"patient", "image"}):
+        raise ValueError("Missing or inconsistent split units.")
+    return units.pop()
+
+
 def split_patients(rows, seed=42):
     groups = sorted({r["patient_id"] for r in rows})
     labels = {r["label"] for r in rows}
@@ -69,13 +100,22 @@ def split_patients(rows, seed=42):
     raise ValueError("Could not create patient-disjoint splits containing every class. Add patients or provide a reviewed split strategy.")
 
 
-def verify_splits(rows):
+def verify_splits(rows, split_unit="patient"):
     groups, pixels = {}, {}
     if not rows or any(r.get("split") not in SPLITS for r in rows):
         raise ValueError("Missing or invalid split.")
     for row in rows:
         split = row["split"]
-        for seen, key in [(groups, row["patient_id"]), (pixels, row["pixel_sha256"])]:
+        if (row.get("split_unit") or "patient") != split_unit:
+            raise ValueError("Inconsistent split units.")
+        if split_unit == "patient" and not row.get("patient_id", "").strip():
+            raise ValueError("Patient grouping is required.")
+        if split_unit == "image" and row.get("patient_id", "").strip():
+            raise ValueError("Patient IDs are present. Use the patient split workflow.")
+        keys = [(pixels, row["pixel_sha256"])]
+        if split_unit == "patient":
+            keys.append((groups, row["patient_id"]))
+        for seen, key in keys:
             if key in seen and seen[key] != split:
                 raise ValueError("Patient or image leakage across dataset splits.")
             seen[key] = split
@@ -89,17 +129,21 @@ def main():
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--split-unit", choices=["patient", "image"], default="patient", help="image is exploratory only: patient independence cannot be established")
     args = parser.parse_args()
     if args.output.exists():
         raise ValueError("Output already exists. Preserve frozen test splits; choose a new output path deliberately.")
-    rows = split_patients(audit_manifest(args.manifest), args.seed)
-    verify_splits(rows)
+    audited = audit_manifest(args.manifest, args.split_unit)
+    rows = split_images(audited, args.seed) if args.split_unit == "image" else split_patients(audited, args.seed)
+    rows = [{**r, "split_unit": args.split_unit} for r in rows]
+    verify_splits(rows, args.split_unit)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS + ["image_sha256", "pixel_sha256", "split"])
+        writer = csv.DictWriter(handle, fieldnames=SPLIT_FIELDS)
         writer.writeheader()
         writer.writerows({k: r[k] for k in writer.fieldnames} for r in rows)
-    report = {s: {"images": sum(r["split"] == s for r in rows), "patients": len({r["patient_id"] for r in rows if r["split"] == s}), "classes": dict(Counter(r["label"] for r in rows if r["split"] == s))} for s in SPLITS}
+    report = {s: {"images": sum(r["split"] == s for r in rows), "patients": len({r["patient_id"] for r in rows if r["split"] == s}) if args.split_unit == "patient" else None, "classes": dict(Counter(r["label"] for r in rows if r["split"] == s))} for s in SPLITS}
+    report["split_unit"] = args.split_unit
     print(json.dumps(report, indent=2))
 
 

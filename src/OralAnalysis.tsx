@@ -17,6 +17,7 @@ import { useApp } from "./App";
 import { isCloud, isClinical } from "./lib/client";
 import { careApi, downloadUrl } from "./lib/services";
 import type { OralImage } from "./lib/types";
+import { hasConsent } from "./lib/care-workflows";
 
 export default function OralAnalysis({
   image,
@@ -32,10 +33,29 @@ export default function OralAnalysis({
     [previewAttempt, setPreviewAttempt] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
+  const clinicalRole = ["medical_officer", "specialist"].includes(
+    w.profile?.role || "",
+  );
   const analyses = w.data.ai_analyses
-    .filter((a) => a.image_id === image.id && a.status === "completed")
+    .filter(
+      (a) =>
+        a.image_id === image.id &&
+        a.status === "completed" &&
+        (!isClinical || (clinicalRole && a.provider === "clinical_assistance")),
+    )
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const result = analyses[0];
+  const localMode =
+    !isClinical &&
+    (w.services.ai_provider === "local" ||
+      w.services.oral_model_ready === true);
+  const clinicalAvailable =
+    isClinical &&
+    w.services.ai &&
+    w.services.ai_provider === "clinical" &&
+    clinicalRole;
+  const aiConsent =
+    !isClinical || hasConsent(w.data, image.patient_id, "ai_assistance");
 
   useEffect(() => {
     if (result && !analyzing && cardRef.current) {
@@ -50,23 +70,27 @@ export default function OralAnalysis({
   }, [result?.id, analyzing]);
   const researchAvailable =
     isCloud &&
-    w.services.ai &&
-    ["research", "gemini", "medgemma"].includes(w.services.ai_provider || "");
-  const geminiMode = ["gemini", "medgemma"].includes(
-    w.services.ai_provider || "",
-  );
+    (localMode ||
+      (w.services.ai &&
+        ["local", "research", "gemini", "medgemma", "clinical"].includes(
+          w.services.ai_provider || "",
+        )));
+  const geminiMode =
+    !localMode && ["gemini", "medgemma"].includes(w.services.ai_provider || "");
   const medgemmaMode =
     w.services.ai_provider === "medgemma" ||
     result?.findings?.engine === "medgemma" ||
     result?.model_version?.includes("medgemma");
   const visionResult =
+    result?.findings?.engine === "clinical" ||
     result?.findings?.engine === "gemini" ||
     result?.findings?.engine === "medgemma";
-  const findings = consent && visionResult ? result.findings : null;
-  const runMock = !isCloud || w.services.ai_provider === "mock";
+  const findings =
+    consent && aiConsent && visionResult ? result.findings : null;
+  const runMock = !isCloud || (!localMode && w.services.ai_provider === "mock");
   const mock = result
     ? result.provider === "mock"
-    : !isCloud || w.services.ai_provider === "mock";
+    : !isCloud || (!localMode && w.services.ai_provider === "mock");
   const good = image.quality_status === "acceptable";
   const quality = image.quality_details;
   const score =
@@ -82,7 +106,11 @@ export default function OralAnalysis({
     setAnalyzing(true);
     try {
       await run(() =>
-        w.execute("analyze", { image_id: image.id, language: lang }),
+        w.execute("analyze", {
+          image_id: image.id,
+          language: lang,
+          ...(localMode ? { engine: "bundled_oral" } : {}),
+        }),
       );
     } finally {
       setAnalyzing(false);
@@ -112,7 +140,19 @@ export default function OralAnalysis({
   const conditionTitle =
     findings?.image_kind === "oral_photo"
       ? findings.possible_conditions[0]?.name || findings.visible_findings[0]
-      : null;
+      : consent && result && !mock && !visionResult
+        ? result.research_label === "benign_lesion"
+          ? copy(
+              "Model classification: benign lesion",
+              "మోడల్ వర్గీకరణ: నిరపాయమైన గాయం",
+            )
+          : result.research_label === "malignant_lesion"
+            ? copy(
+                "Model classification: malignant lesion",
+                "మోడల్ వర్గీకరణ: ప్రాణాంతక గాయం",
+              )
+            : null
+        : null;
 
   return (
     <article
@@ -285,7 +325,7 @@ export default function OralAnalysis({
         }
         aria-busy={analyzing}
       >
-        {isClinical ? (
+        {isClinical && !clinicalAvailable && !result ? (
           <>
             <h3>{copy("Clinician image review", "వైద్యుని చిత్ర సమీక్ష")}</h3>
             <p>
@@ -296,8 +336,8 @@ export default function OralAnalysis({
             </p>
             <p className="small muted">
               {copy(
-                "Automated disease analysis is not enabled in this clinical workspace.",
-                "ఈ వైద్య కార్యస్థలంలో స్వయంచాలక వ్యాధి విశ్లేషణ ప్రారంభించబడలేదు.",
+                "AI assistance requires a configured clinical model and an assigned clinician. Manual clinical review remains available.",
+                "AI సహాయానికి క్లినికల్ మోడల్ మరియు నియమిత వైద్యుడు అవసరం. వైద్య సమీక్ష అందుబాటులో ఉంది.",
               )}
             </p>
           </>
@@ -312,19 +352,30 @@ export default function OralAnalysis({
                 <h3>{copy("Image observations", "చిత్ర పరిశీలనలు")}</h3>
               </div>
               <span className="analysis-mode">
-                {medgemmaMode
+                {isClinical
                   ? copy(
-                      "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
-                      "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
+                      "AI DRAFT · CLINICIAN REVIEW REQUIRED",
+                      "AI ముసాయిదా · వైద్య సమీక్ష అవసరం",
                     )
-                  : visionResult
+                  : localMode &&
+                      (!result || result.model_version === "oral-mendeley-v1")
                     ? copy(
-                        "GEMINI · RESEARCH ONLY",
-                        "జెమిని · పరిశోధన కోసం మాత్రమే",
+                        "TRAINED ORAL MODEL · UNDER VALIDATION",
+                        "శిక్షణ పొందిన నోటి మోడల్ · ధృవీకరణలో ఉంది",
                       )
-                    : mock
-                      ? copy("SIMULATED ANALYSIS", "అనుకరణ విశ్లేషణ")
-                      : copy("RESEARCH EVALUATION", "పరిశోధన మూల్యాంకనం")}
+                    : medgemmaMode
+                      ? copy(
+                          "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
+                          "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
+                        )
+                      : visionResult
+                        ? copy(
+                            "GEMINI · RESEARCH ONLY",
+                            "జెమిని · పరిశోధన కోసం మాత్రమే",
+                          )
+                        : mock
+                          ? copy("SIMULATED ANALYSIS", "అనుకరణ విశ్లేషణ")
+                          : copy("RESEARCH EVALUATION", "పరిశోధన మూల్యాంకనం")}
               </span>
             </div>
 
@@ -338,8 +389,9 @@ export default function OralAnalysis({
                     w.busy ||
                     analyzing ||
                     !consent ||
+                    !aiConsent ||
                     !good ||
-                    (isCloud && !w.services.ai)
+                    (isCloud && !w.services.ai && !localMode)
                   }
                   onClick={() => void analyze()}
                 >
@@ -350,26 +402,55 @@ export default function OralAnalysis({
                   )}
                   {analyzing
                     ? copy("Analysing image…", "చిత్రం విశ్లేషిస్తోంది…")
-                    : runMock
-                      ? t("analyze")
-                      : medgemmaMode
-                        ? copy(
-                            "Analyse with Google MedGemma",
-                            "గూగుల్ మెడ్‌జెమ్మాతో విశ్లేషించండి",
-                          )
-                        : geminiMode
-                          ? result
+                    : isClinical
+                      ? copy(
+                          "Request AI assistance",
+                          "AI సహాయాన్ని అభ్యర్థించండి",
+                        )
+                      : runMock
+                        ? t("analyze")
+                        : medgemmaMode
+                          ? copy(
+                              "Analyse with Google MedGemma",
+                              "గూగుల్ మెడ్‌జెమ్మాతో విశ్లేషించండి",
+                            )
+                          : localMode
                             ? copy(
-                                "Re-analyse with Gemini",
-                                "జెమినితో మళ్లీ విశ్లేషించండి",
+                                "Analyse with oral model",
+                                "నోటి మోడల్‌తో విశ్లేషించండి",
                               )
-                            : copy(
-                                "Analyse with Gemini",
-                                "జెమినితో విశ్లేషించండి",
-                              )
-                          : copy("Analyse image", "చిత్రాన్ని విశ్లేషించండి")}
+                            : geminiMode
+                              ? result
+                                ? copy(
+                                    "Re-analyse with Gemini",
+                                    "జెమినితో మళ్లీ విశ్లేషించండి",
+                                  )
+                                : copy(
+                                    "Analyse with Gemini",
+                                    "జెమినితో విశ్లేషించండి",
+                                  )
+                              : copy(
+                                  "Analyse image",
+                                  "చిత్రాన్ని విశ్లేషించండి",
+                                )}
                 </button>
               </div>
+            )}
+            {isClinical && !aiConsent && (
+              <p role="status" className="small muted">
+                {copy(
+                  "Record separate AI image assistance consent in Patient consent before requesting analysis.",
+                  "విశ్లేషణ కోరే ముందు రోగి సమ్మతిలో AI చిత్ర సహాయానికి వేరు సమ్మతిని నమోదు చేయండి.",
+                )}
+              </p>
+            )}
+            {isClinical && (
+              <p className="small muted">
+                {copy(
+                  "AI output is an unsigned draft. Examine the patient and record your own assessment in the clinical review; AI does not sign a diagnosis or change treatment.",
+                  "AI ఫలితం సంతకం చేయని ముసాయిదా. రోగిని పరీక్షించి వైద్య సమీక్షలో మీ అంచనాను నమోదు చేయండి; AI నిర్ధారణకు సంతకం చేయదు లేదా చికిత్సను మార్చదు.",
+                )}
+              </p>
             )}
 
             {result && conditionTitle && (
@@ -418,7 +499,7 @@ export default function OralAnalysis({
                             "చిత్ర విశ్లేషణకు సిద్ధం",
                           )}
                 </h4>
-                {!visionResult && (
+                {!isClinical && !visionResult && (
                   <div className="analysis-score">
                     <span>
                       {copy("Model class score", "మోడల్ వర్గ స్కోర్")}
@@ -430,7 +511,7 @@ export default function OralAnalysis({
                     </strong>
                   </div>
                 )}
-                {!visionResult && consent && score !== null && (
+                {!isClinical && !visionResult && consent && score !== null && (
                   <meter
                     min={0}
                     max={1}
@@ -439,25 +520,30 @@ export default function OralAnalysis({
                   />
                 )}
                 <p>
-                  {visionResult
+                  {isClinical
                     ? copy(
-                        "Research observations only. A photograph cannot establish a diagnosis; independent clinician examination is required.",
-                        "వైద్య సమీక్ష కోసం AI పరిశీలనలు. తుది నిర్ధారణను వైద్య అధికారి ధృవీకరిస్తారు.",
+                        "AI draft observations require independent clinician examination and review. A photograph alone cannot establish a diagnosis.",
+                        "AI ముసాయిదా పరిశీలనలకు స్వతంత్ర వైద్య పరీక్ష మరియు సమీక్ష అవసరం. ఫోటో ఒక్కటే నిర్ధారణ చేయలేదు.",
                       )
-                    : mock
-                      ? result
-                        ? copy(
-                            "No medical prediction was made. Independent clinician examination required.",
-                            "వైద్య అంచనా చేయలేదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
-                          )
+                    : visionResult
+                      ? copy(
+                          "Research observations only. A photograph cannot establish a diagnosis; independent clinician examination is required.",
+                          "వైద్య సమీక్ష కోసం AI పరిశీలనలు. తుది నిర్ధారణను వైద్య అధికారి ధృవీకరిస్తారు.",
+                        )
+                      : mock
+                        ? result
+                          ? copy(
+                              "No medical prediction was made. Independent clinician examination required.",
+                              "వైద్య అంచనా చేయలేదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
+                            )
+                          : copy(
+                              "Workflow test only. No medical prediction is produced.",
+                              "వర్క్‌ఫ్లో పరీక్ష మాత్రమే. వైద్య అంచనా ఇవ్వబడదు.",
+                            )
                         : copy(
-                            "Workflow test only. No medical prediction is produced.",
-                            "వర్క్‌ఫ్లో పరీక్ష మాత్రమే. వైద్య అంచనా ఇవ్వబడదు.",
-                          )
-                      : copy(
-                          "Uncalibrated research model score; it is not a disease probability. Independent clinician examination is required.",
-                          "క్రమాంకనం చేయని పరిశోధన మోడల్ స్కోర్; ఇది వ్యాధి సంభావ్యత కాదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
-                        )}
+                            "Uncalibrated research model score; it is not a disease probability. Independent clinician examination is required.",
+                            "క్రమాంకనం చేయని పరిశోధన మోడల్ స్కోర్; ఇది వ్యాధి సంభావ్యత కాదు. స్వతంత్ర వైద్య పరీక్ష అవసరం.",
+                          )}
                 </p>
               </div>
               {findings && (

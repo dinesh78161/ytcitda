@@ -4,8 +4,11 @@ AAROHAN 2026 screening-to-care workspace, built with React, TypeScript, Vite and
 Supabase PostgreSQL. Clinical mode supports clinician-led records, consent, review,
 referrals and follow-up. See [clinical activation](docs/CLINICAL_WORKSPACE.md).
 Evaluation and local training retain test data and research-only AI.
+For real-record AI assistance, see [clinical AI integration](docs/CLINICAL_AI.md)
+and the [model selection and validation assessment](docs/CLINICAL_AI_VALIDATION.md).
 
-Deployed demonstration: https://aarogya-drishti-om9g.onrender.com/
+Hosted pilot: https://aarogya-drishti-om9g.onrender.com/
+For the 12 November presentation, follow the [live walkthrough](docs/LIVE_PRESENTATION.md).
 Start with the [release handoff](docs/RELEASE_HANDOFF.md),
 [handbook checklist](docs/HANDBOOK_CHECKLIST.md),
 [test report](docs/TEST_REPORT.md), and [submission guide](docs/SUBMISSION.md).
@@ -45,8 +48,11 @@ server serves both the frontend and API; use `npm run build:render` and `npm sta
   [language setup and Gemini reports](docs/LANGUAGES.md).
 - Registration, consent and screening intake; clinical drafts stay in session memory.
 - IndexedDB demo persistence, offline registration queue and reconnect retries.
-- Demo educational-photo upload, decoded image validation, prototype exposure/blur
-  checks, retake guidance and clearly labelled mock AI. No disease prediction.
+- Oral-photo upload, decoded image validation, exposure/blur checks and retake guidance.
+- A bundled MobileNetV3 oral-image classifier runs real CPU inference inside the
+  Node service without an external model API. Its benign/malignant dataset-class
+  predictions remain under validation and require independent clinician review.
+- A separate mock provider remains available for workflow-only testing.
 - Independent clinician review, signed history, referrals and appointment booking.
 - Attendance, missed-visit tasks, clinician-entered diagnostic outcomes and follow-up.
 - Investigation stages, PDF/JPEG reports, treatment plans and immutable progress history.

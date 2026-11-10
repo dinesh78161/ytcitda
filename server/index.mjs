@@ -5,6 +5,11 @@ import { createClient } from "@supabase/supabase-js";
 import { createStaticHandler } from "./static.mjs";
 import { storePrivateUpload } from "./private-upload.mjs";
 import { enforceVerifiedAssurance } from "./security.mjs";
+import { createLocalOralModel } from "./local-oral-model.mjs";
+import {
+  analyzeWithClinicalModel,
+  clinicalAIConfigured,
+} from "./clinical-ai.mjs";
 import {
   analyzeWithGemini,
   GEMINI_DEFAULT_MODEL,
@@ -32,6 +37,7 @@ export function createServices(
   env = process.env,
   fetcher = fetch,
   clientFactory = createClient,
+  { localModel: suppliedLocalModel } = {},
 ) {
   const configured = Boolean(
     env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY && env.SUPABASE_SECRET_KEY,
@@ -51,22 +57,37 @@ export function createServices(
   const aiMode =
     env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
   requireValue(
-    ["mock", "research", "gemini", "medgemma", "disabled"].includes(aiMode),
+    [
+      "mock",
+      "local",
+      "research",
+      "gemini",
+      "medgemma",
+      "clinical",
+      "disabled",
+    ].includes(aiMode),
     503,
-    "SCREENING_AI_MODE must be mock, research, gemini, medgemma or disabled.",
+    "SCREENING_AI_MODE must be mock, local, research, gemini, medgemma, clinical or disabled.",
   );
+  const localModel =
+    !clinical && (aiMode === "local" || suppliedLocalModel)
+      ? suppliedLocalModel || createLocalOralModel()
+      : null;
   const aiEnabled =
-    !clinical &&
     configured &&
-    (aiMode === "mock" ||
-      ((aiMode === "gemini" || aiMode === "medgemma") &&
-        Boolean(env.GEMINI_API_KEY?.trim())) ||
-      (aiMode === "research" &&
-        !!(
-          env.SCREENING_MODEL_URL &&
-          env.SCREENING_MODEL_KEY &&
-          env.SCREENING_MODEL_VERSION
-        )));
+    (clinical
+      ? aiMode === "clinical" && clinicalAIConfigured(env)
+      : aiMode === "mock" ||
+        aiMode === "local" ||
+        ((aiMode === "gemini" || aiMode === "medgemma") &&
+          Boolean(env.GEMINI_API_KEY?.trim())) ||
+        (aiMode === "research" &&
+          !!(
+            env.SCREENING_MODEL_URL &&
+            env.SCREENING_MODEL_KEY &&
+            env.SCREENING_MODEL_VERSION
+          )));
+  const activeClinicalImages = new Set();
   const videoProvider =
     env.VIDEO_PROVIDER ||
     (env.LIVEKIT_URL ? "livekit" : env.DAILY_API_KEY ? "daily" : "disabled");
@@ -85,8 +106,17 @@ export function createServices(
     files: configured,
     video: videoEnabled,
     video_provider: videoEnabled ? videoProvider : "disabled",
-    ai: aiEnabled,
-    ai_provider: aiEnabled ? aiMode : "disabled",
+    ai: aiEnabled && (!localModel || localModel.status().ready),
+    ai_provider:
+      aiEnabled && (!localModel || localModel.status().ready)
+        ? aiMode
+        : "disabled",
+    ...(localModel
+      ? {
+          oral_model_ready: localModel.status().ready,
+          oral_model_version: localModel.status().model_version,
+        }
+      : {}),
     workspace_mode: clinical ? "clinical" : "evaluation",
     reminders:
       configured &&
@@ -169,7 +199,7 @@ export function createServices(
   async function consent(ctx, id, purpose) {
     const { data, error } = await ctx.user
       .from("consents")
-      .select("granted")
+      .select("id,granted")
       .eq("patient_id", id)
       .eq("purpose", purpose)
       .order("recorded_at", { ascending: false })
@@ -179,6 +209,7 @@ export function createServices(
       403,
       `Current ${purpose.replaceAll("_", " ")} consent is required.`,
     );
+    return data[0];
   }
   async function audit(ctx, action, type, id) {
     checked(
@@ -310,7 +341,9 @@ export function createServices(
         }
       } else {
         if (data.object_key) {
-          await admin.storage.from("pathology-reports").remove([data.object_key]);
+          await admin.storage
+            .from("pathology-reports")
+            .remove([data.object_key]);
         }
       }
       await admin.from(table).delete().eq("id", data.id);
@@ -347,8 +380,8 @@ export function createServices(
           ctx.profile.role === "specialist"
             ? "Specialist Doctor"
             : ctx.profile.role === "medical_officer"
-            ? "Medical Officer (Doctor)"
-            : "Community Health Worker";
+              ? "Medical Officer (Doctor)"
+              : "Community Health Worker";
         const participantName = ctx.profile.display_name
           ? `${ctx.profile.display_name} (${roleLabel})`
           : roleLabel;
@@ -430,8 +463,8 @@ export function createServices(
         ctx.profile.role === "specialist"
           ? "Specialist Doctor"
           : ctx.profile.role === "medical_officer"
-          ? "Medical Officer (Doctor)"
-          : "Community Health Worker";
+            ? "Medical Officer (Doctor)"
+            : "Community Health Worker";
       const dailyParticipantName = ctx.profile.display_name
         ? `${ctx.profile.display_name} (${dailyRoleLabel})`
         : dailyRoleLabel;
@@ -465,12 +498,21 @@ export function createServices(
       };
     }
     if (path === "/api/analyze") {
+      const useLocalModel =
+        aiMode === "local" || body.engine === "bundled_oral";
       requireValue(
-        status().ai,
+        useLocalModel
+          ? !clinical && Boolean(localModel?.status().ready)
+          : status().ai,
         503,
         "Image analysis is disabled or its AI provider is not configured. Ask your workspace administrator to finish AI setup. Clinician review remains available.",
       );
-      role(ctx, ["health_worker", "medical_officer", "specialist"]);
+      role(
+        ctx,
+        clinical
+          ? ["medical_officer", "specialist"]
+          : ["health_worker", "medical_officer", "specialist"],
+      );
       requireValue(uuid(body.image_id), 400, "Invalid image ID.");
       const { data: image, error } = await ctx.user
         .from("images")
@@ -479,6 +521,78 @@ export function createServices(
         .maybeSingle();
       requireValue(!error && image, 403, "Assigned image required.");
       const record = await patient(ctx, image.patient_id);
+      if (clinical) {
+        requireValue(
+          record.is_synthetic === false,
+          403,
+          "A clinical patient record is required.",
+        );
+        const capability = await ctx.user.rpc(
+          "clinical_image_assistance_policy",
+        );
+        requireValue(
+          !capability.error &&
+            capability.data?.version === 1 &&
+            capability.data?.mode === "clinical",
+          503,
+          "Apply the clinical image assistance database update before enabling this service.",
+        );
+        await consent(ctx, image.patient_id, "image_capture");
+        const permission = await consent(
+          ctx,
+          image.patient_id,
+          "ai_assistance",
+        );
+        requireValue(
+          image.quality_status === "acceptable",
+          409,
+          "Retake this image before analysis.",
+        );
+        requireValue(
+          !activeClinicalImages.has(image.id) && activeClinicalImages.size < 2,
+          429,
+          "Image analysis is already running or at capacity. Wait before retrying.",
+        );
+        activeClinicalImages.add(image.id);
+        try {
+          const blob = checked(
+            await admin.storage.from("oral-images").download(image.object_key),
+          );
+          const result = await analyzeWithClinicalModel({
+            bytes: await blob.arrayBuffer(),
+            env,
+            language: body.language ?? "en",
+            fetcher,
+          });
+          await patient(ctx, image.patient_id);
+          await consent(ctx, image.patient_id, "image_capture");
+          const currentPermission = await consent(
+            ctx,
+            image.patient_id,
+            "ai_assistance",
+          );
+          requireValue(
+            currentPermission.id === permission.id,
+            409,
+            "AI consent changed during analysis. No AI draft was saved.",
+          );
+          const saved = checked(
+            await admin
+              .from("ai_analyses")
+              .insert({
+                ...result,
+                image_id: image.id,
+                requested_by: ctx.profile.id,
+                assistance_consent_id: permission.id,
+              })
+              .select("id")
+              .single(),
+          );
+          return { id: saved.id, ...result };
+        } finally {
+          activeClinicalImages.delete(image.id);
+        }
+      }
       requireValue(
         record.is_synthetic === true,
         403,
@@ -491,7 +605,7 @@ export function createServices(
         "Retake this image before analysis.",
       );
       let result;
-      if (aiMode === "mock") {
+      if (aiMode === "mock" && !useLocalModel) {
         result = {
           provider: "mock",
           model_version: "mock-v1",
@@ -503,7 +617,7 @@ export function createServices(
           warning: "NOT FOR CLINICAL USE",
         };
       } else {
-        if (aiMode === "gemini" || aiMode === "medgemma") {
+        if (!useLocalModel && (aiMode === "gemini" || aiMode === "medgemma")) {
           const capability = await ctx.user.rpc("image_findings_policy");
           requireValue(
             !capability.error && capability.data?.version === 1,
@@ -514,7 +628,10 @@ export function createServices(
         const blob = checked(
           await admin.storage.from("oral-images").download(image.object_key),
         );
-        if (aiMode === "gemini" || aiMode === "medgemma") {
+        if (useLocalModel) {
+          const raw = await localModel.infer(await blob.arrayBuffer());
+          result = validateModelResult(raw, localModel.status().model_version);
+        } else if (aiMode === "gemini" || aiMode === "medgemma") {
           result = await analyzeWithGemini({
             bytes: await blob.arrayBuffer(),
             key: env.GEMINI_API_KEY,
@@ -554,7 +671,9 @@ export function createServices(
       );
       await audit(
         ctx,
-        aiMode === "mock" ? "MOCK_ANALYSIS" : "RESEARCH_ANALYSIS",
+        aiMode === "mock" && !useLocalModel
+          ? "MOCK_ANALYSIS"
+          : "RESEARCH_ANALYSIS",
         "ai_analyses",
         saved.id,
       );
@@ -638,7 +757,14 @@ export function createServices(
       dispatching = false;
     }
   }
-  return { status, authenticate, handle, dispatchReminders };
+  return {
+    status,
+    authenticate,
+    handle,
+    dispatchReminders,
+    ready: () => localModel?.ready() || Promise.resolve(),
+    close: () => localModel?.close() || Promise.resolve(),
+  };
 }
 
 export function createApi(services, env = process.env, { staticDir } = {}) {
@@ -752,6 +878,7 @@ if (
 ) {
   const services = createServices(),
     server = createApi(services);
+  await services.ready();
   server.listen(
     Number(process.env.API_PORT || 8787),
     process.env.API_HOST || "127.0.0.1",
@@ -774,5 +901,6 @@ if (
     process.on(signal, () => {
       clearInterval(timer);
       server.close();
+      void services.close();
     });
 }

@@ -104,6 +104,20 @@ export async function fetchPatientRegistrationStaff(): Promise<
 export async function submitCloud(command: Command) {
   if (!supabase) throw new Error("Supabase is not configured.");
   if (
+    command.action === "consent" &&
+    command.payload.purpose === "ai_assistance"
+  ) {
+    const policy = await supabase.rpc("clinical_image_assistance_policy");
+    if (
+      policy.error ||
+      policy.data?.version !== 1 ||
+      policy.data?.mode !== "clinical"
+    )
+      throw new Error(
+        "Apply the clinical image assistance database update before recording AI consent.",
+      );
+  }
+  if (
     command.action === "register" &&
     command.payload.language &&
     !["en", "te"].includes(String(command.payload.language))

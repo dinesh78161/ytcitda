@@ -5,10 +5,34 @@ import tempfile
 import unittest
 from pathlib import Path
 from PIL import Image
-from prepare import FIELDS, audit_manifest, split_patients, verify_splits
+from prepare import FIELDS, audit_manifest, manifest_split_unit, split_images, split_patients, verify_splits
 
 
 class DatasetChecks(unittest.TestCase):
+    def test_exploratory_split_is_stratified_and_never_fabricates_patients(self):
+        rows = [{"patient_id": "", "label": "a" if i % 2 else "b", "pixel_sha256": str(i)} for i in range(30)]
+        split = split_images(rows)
+        verify_splits(split, "image")
+        self.assertEqual(manifest_split_unit(split), "image")
+        self.assertEqual(split, split_images(list(reversed(rows))))
+        self.assertTrue(all(r["patient_id"] == "" for r in split))
+        with self.assertRaises(ValueError):
+            verify_splits(split)
+        split[0]["split_unit"] = "patient"
+        with self.assertRaises(ValueError):
+            manifest_split_unit(split)
+
+    def test_known_patients_cannot_use_exploratory_image_split(self):
+        with self.assertRaisesRegex(ValueError, "Patient IDs"):
+            split_images([{"patient_id": "known", "label": "a", "pixel_sha256": "1"}])
+
+    def test_exploratory_split_rejects_pixel_leakage(self):
+        rows = split_images([{"patient_id": "", "label": "a" if i % 2 else "b", "pixel_sha256": str(i)} for i in range(30)])
+        other = next(r for r in rows if r["split"] != rows[0]["split"])
+        other["pixel_sha256"] = rows[0]["pixel_sha256"]
+        with self.assertRaisesRegex(ValueError, "leakage"):
+            verify_splits(rows, "image")
+
     def test_patient_groups_and_split_reproducibility(self):
         rows = [{"patient_id": f"subject-{i}", "label": "benign_lesion" if i % 2 else "malignant_lesion", "pixel_sha256": str(i)} for i in range(30)]
         split = split_patients(rows)

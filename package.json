@@ -8,6 +8,7 @@
     "dev:api": "node --env-file-if-exists=.env.server server/index.mjs",
     "dev:all": "node scripts/dev.mjs",
     "ai:check": "node --env-file-if-exists=.env.server scripts/check-gemini.mjs",
+    "ai:check:clinical": "node --env-file-if-exists=.env.server scripts/check-clinical-ai.mjs",
     "db:check": "node --env-file-if-exists=.env.server scripts/check-db.mjs",
     "db:prepare": "node scripts/prepare-db.mjs",
     "build": "tsc --noEmit && vite build",
@@ -15,7 +16,7 @@
     "prebuild:render": "npm test",
     "start": "node --env-file-if-exists=.env.server server/start.mjs",
     "preview": "vite preview",
-    "test": "node tests/i18n.test.mjs && node tests/patient-report.test.mjs && node tests/clinical-workspace.test.mjs && node tests/database.test.mjs && node tests/workflow.test.mjs && node tests/care.test.mjs && node tests/journey.test.mjs && node tests/services.test.mjs && node tests/provider.test.mjs && node tests/uploads.test.mjs && node tests/production.test.mjs && node tests/security.test.mjs && node tests/backup.test.mjs && node tests/medgemma-quality.test.mjs && node tests/clinical-samples.test.mjs",
+    "test": "node tests/i18n.test.mjs && node tests/patient-report.test.mjs && node tests/clinical-workspace.test.mjs && node tests/database.test.mjs && node tests/workflow.test.mjs && node tests/care.test.mjs && node tests/journey.test.mjs && node tests/services.test.mjs && node tests/clinical-ai.test.mjs && node tests/clinical-ai-ui.test.mjs && node tests/oral-model.test.mjs && node tests/provider.test.mjs && node tests/uploads.test.mjs && node tests/production.test.mjs && node tests/security.test.mjs && node tests/backup.test.mjs && node tests/medgemma-quality.test.mjs && node tests/clinical-samples.test.mjs",
     "test:patient-report": "node tests/patient-report.test.mjs",
     "test:deployed": "node scripts/check-deployment.mjs",
     "test:hosted": "node --env-file-if-exists=.env.server --env-file-if-exists=.env.acceptance scripts/check-hosted.mjs",
@@ -30,7 +31,8 @@
     "test:passwords": "node --env-file-if-exists=.env.server --env-file-if-exists=.env.acceptance scripts/check-passwords.mjs",
     "db:security": "node --env-file-if-exists=.env.server --env-file-if-exists=.env.recovery scripts/apply-security.mjs",
     "test:security:browser": "playwright test --config playwright.security.config.ts",
-    "test:hosted:mfa": "node --env-file-if-exists=.env.server scripts/check-hosted-mfa.mjs"
+    "test:hosted:mfa": "node --env-file-if-exists=.env.server scripts/check-hosted-mfa.mjs",
+    "ai:check:local": "node scripts/check-oral-model.mjs"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -62,6 +64,7 @@
     "livekit-client": "2.23.0",
     "livekit-server-sdk": "2.19.2",
     "lucide-react": "1.61.0",
+    "onnxruntime-node": "1.31.1",
     "pdf-lib": "1.17.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"

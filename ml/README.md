@@ -1,11 +1,59 @@
 # Oral-image research training kit
 
 This kit prepares a MobileNetV3-Small photograph classifier and an inference adapter
-for the existing `/api/analyze` endpoint. **No oral model has been trained yet.**
+for the existing `/api/analyze` endpoint. Models produced here are research artifacts.
 ImageNet initialization is general image pretraining, not oral-disease knowledge.
 This kit does not activate a trained model in the app. Gemini evaluation is a
 separate integration; use `SCREENING_AI_MODE=research` for this versioned model
 endpoint when it is ready. Training longer does not establish greater accuracy.
+
+## Quick start: the local Oral Images Dataset
+
+From the `ytcitda` directory, use the extracted dataset in `../Oral Images Dataset`.
+The importer reads **only `original_data`**, records attribution and folder-label
+provenance, excludes undecodable/undersized/oversized images and exact duplicates,
+and writes every exclusion to `import-report.json`. It leaves source files intact.
+It does not invent patient IDs or independently verify medical labels.
+
+```powershell
+python -m venv .venv-oral
+.\.venv-oral\Scripts\python -m pip install -r ml/requirements.txt
+.\.venv-oral\Scripts\python ml/import_oral_dataset.py "../Oral Images Dataset" --output ml/data/mendeley-v2
+.\.venv-oral\Scripts\python ml/prepare.py ml/data/mendeley-v2/manifest.csv --split-unit image --output ml/data/mendeley-v2/splits-v1.csv
+.\.venv-oral\Scripts\python ml/train.py ml/data/mendeley-v2/splits-v1.csv --split-unit image --output ml/artifacts/oral-mendeley-v1 --version oral-mendeley-v1 --epochs 15
+```
+
+The local import contains 285 eligible originals (155 benign, 130 malignant);
+38 originals fail the image-size limits. The seeded stratified image split uses
+199 training, 43 validation and 43 test images. Patient identifiers are unavailable:
+**this explicitly exploratory image split cannot establish patient independence**.
+Patient/source overlap and near-duplicates may inflate scores. Results from this
+split are not clinical performance evidence. `evaluation_unit: image` and these
+limitations are retained in the checkpoint and evaluation report; patient counts
+are `null`, never fabricated. The patient workflow below remains the default and
+rejects missing IDs. Training requires an explicit matching `--split-unit image`.
+
+First training downloads official ImageNet initialization into
+`ml/artifacts/pretrained/`. Augmentation occurs only during training; the selected
+checkpoint and temperature use validation data only. The test set is evaluated
+once after selection. Preserve the split and choose new output/version names for
+future experiments. Do not choose a model version using test performance.
+
+Run the resulting checkpoint on a local photograph:
+
+```powershell
+.\.venv-oral\Scripts\python ml/predict.py ml/artifacts/oral-mendeley-v1/model.pt "path/to/oral-photo.jpg"
+```
+
+This prints the predicted dataset class, both class scores, model version,
+evaluation unit and a research warning. It does not save the photograph. These
+scores are not individual cancer probabilities. The two classes do not describe
+healthy mouths, every oral disease, or whether an input actually depicts a mouth.
+
+Serve it using the authenticated adapter in section 4. The existing app research
+integration accepts its versioned response and shows the benign/malignant model
+classification for clinician review. HTTPS hosting and API environment configuration
+are needed to connect it to a hosted app; training does not switch the live provider.
 
 ## 1. Obtain and label suitable data
 
@@ -20,7 +68,7 @@ Dataset sources checked on 29 October 2026:
   lists 165 benign and 158 malignant original images, plus augmented copies, under
   CC BY 4.0. It is a possible small research baseline. Its public description does
   not establish patient identifiers, subject independence, or local clinical
-  performance. Obtain patient grouping from the authors before using this kit;
+  performance. Obtain patient grouping from the authors for the patient workflow;
   do not fabricate one patient ID per image. Preserve attribution. Do not count
   augmented copies as new patients or put them into evaluation sets.
 - [Annotated Oral Cavity Images, Zenodo](https://zenodo.org/records/10664056)
@@ -122,7 +170,8 @@ output signs a diagnosis or changes treatment automatically.
 python -m unittest discover -s ml -p "test_*.py"
 ```
 
-These checks use generated non-medical fixtures to test dataset integrity; they
+These checks use generated non-medical fixtures to test dataset integrity and the
+authenticated inference contract (including invalid requests/checkpoints); they
 provide no clinical performance evidence. Training and inference require the
 dependencies above and suitable data. No numeric performance claim is included.
 

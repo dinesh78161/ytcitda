@@ -47,6 +47,9 @@ export function ConsentPanel({ patient }: { patient: Patient }) {
         ["screening", l("Screening and records", "పరీక్షలు మరియు రికార్డులు")],
         ["image_capture", l("Oral photographs", "నోటి చిత్రాలు")],
         ["teleconsultation", l("Video consultation", "వీడియో సంప్రదింపు")],
+        ...(isClinical
+          ? [["ai_assistance", l("AI image assistance", "AI చిత్ర సహాయం")]]
+          : []),
       ].map(([purpose, label]) => {
         const granted = hasConsent(w.data, patient.id, purpose);
         return (
@@ -58,6 +61,14 @@ export function ConsentPanel({ patient }: { patient: Patient }) {
                   ? l("Granted", "అంగీకరించారు")
                   : l("Not granted", "అంగీకారం లేదు")}
               </small>
+              {purpose === "ai_assistance" && (
+                <small>
+                  {l(
+                    "Explain that the photograph is sent to the configured clinical model service for a draft that a clinician must review. Record the patient's choice separately from photo consent.",
+                    "వైద్యుడు సమీక్షించాల్సిన ముసాయిదా కోసం చిత్రాన్ని క్లినికల్ మోడల్ సేవకు పంపుతామని వివరించండి. ఫోటో సమ్మతికి వేరుగా రోగి నిర్ణయాన్ని నమోదు చేయండి.",
+                  )}
+                </small>
+              )}
             </span>
             <button
               className="button subtle"
@@ -718,7 +729,10 @@ export function AppointmentTools({
       )}
       {video && (
         <Modal
-          title={l("Private clinical consultation", "వ్యక్తిగత క్లినికల్ సంప్రదింపు")}
+          title={l(
+            "Private clinical consultation",
+            "వ్యక్తిగత క్లినికల్ సంప్రదింపు",
+          )}
           onClose={() => setVideo(null)}
           allowMaximize={true}
           className="consultation-modal"
@@ -733,7 +747,10 @@ export function AppointmentTools({
                 lang={lang}
                 userRole={w.profile?.role}
                 userName={w.profile?.display_name}
-                patientName={w.data.patients.find((p) => p.id === a.patient_id)?.display_name}
+                patientName={
+                  w.data.patients.find((p) => p.id === a.patient_id)
+                    ?.display_name
+                }
               />
             </Suspense>
           ) : (

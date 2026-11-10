@@ -1,0 +1,218 @@
+{
+  "architecture": "mobilenet_v3_small",
+  "classes": [
+    "benign_lesion",
+    "malignant_lesion"
+  ],
+  "model_version": "oral-mendeley-v1",
+  "clinical_use": false,
+  "evaluation_unit": "image",
+  "limitations": "Exploratory image-level evaluation only. Patient independence is unverified; patient/source overlap and near-duplicates may inflate metrics. Dataset folder labels are not independently verified. No external or prospective clinical validation. Scores are not cancer probabilities. More epochs do not guarantee improvement.",
+  "seed": 42,
+  "temperature": 0.7834041118621826,
+  "selected_epoch": 10,
+  "manifest_sha256": "12268b1fa6197fc21a5f490ece6604629899fca7413769f2ef4feecb1a274a09",
+  "test_patients": null,
+  "split_counts": {
+    "train": {
+      "images": 199,
+      "classes": {
+        "benign_lesion": 109,
+        "malignant_lesion": 90
+      }
+    },
+    "validation": {
+      "images": 43,
+      "classes": {
+        "benign_lesion": 23,
+        "malignant_lesion": 20
+      }
+    },
+    "test": {
+      "images": 43,
+      "classes": {
+        "benign_lesion": 23,
+        "malignant_lesion": 20
+      }
+    }
+  },
+  "held_out_test": {
+    "images": 43,
+    "accuracy": 0.9069767441860465,
+    "balanced_accuracy": 0.9097826086956522,
+    "roc_auc": 0.941304347826087,
+    "positive_class": "malignant_lesion",
+    "log_loss": 0.3052689731121063,
+    "confusion_matrix": [
+      [
+        20,
+        3
+      ],
+      [
+        1,
+        19
+      ]
+    ],
+    "per_class": {
+      "benign_lesion": {
+        "sensitivity": 0.8695652173913043,
+        "specificity": 0.95,
+        "support": 23
+      },
+      "malignant_lesion": {
+        "sensitivity": 0.95,
+        "specificity": 0.8695652173913043,
+        "support": 20
+      }
+    },
+    "classification_report": {
+      "benign_lesion": {
+        "precision": 0.9523809523809523,
+        "recall": 0.8695652173913043,
+        "f1-score": 0.9090909090909091,
+        "support": 23.0
+      },
+      "malignant_lesion": {
+        "precision": 0.8636363636363636,
+        "recall": 0.95,
+        "f1-score": 0.9047619047619048,
+        "support": 20.0
+      },
+      "accuracy": 0.9069767441860465,
+      "macro avg": {
+        "precision": 0.9080086580086579,
+        "recall": 0.9097826086956522,
+        "f1-score": 0.9069264069264069,
+        "support": 43.0
+      },
+      "weighted avg": {
+        "precision": 0.9111043994764926,
+        "recall": 0.9069767441860465,
+        "f1-score": 0.9070774187053258,
+        "support": 43.0
+      }
+    }
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "training_loss": 0.6417969743810107,
+      "validation_loss": 0.5913335680961609,
+      "seconds": 6.8
+    },
+    {
+      "epoch": 2,
+      "training_loss": 0.5106795505063617,
+      "validation_loss": 0.4977283775806427,
+      "seconds": 6.36
+    },
+    {
+      "epoch": 3,
+      "training_loss": 0.43295963864829673,
+      "validation_loss": 0.4289018511772156,
+      "seconds": 6.22
+    },
+    {
+      "epoch": 4,
+      "training_loss": 0.37446035047871384,
+      "validation_loss": 0.3717601001262665,
+      "seconds": 6.25
+    },
+    {
+      "epoch": 5,
+      "training_loss": 0.293617994342018,
+      "validation_loss": 0.33049476146698,
+      "seconds": 6.22
+    },
+    {
+      "epoch": 6,
+      "training_loss": 0.21805356165871548,
+      "validation_loss": 0.29397761821746826,
+      "seconds": 6.22
+    },
+    {
+      "epoch": 7,
+      "training_loss": 0.2311017989513263,
+      "validation_loss": 0.28085845708847046,
+      "seconds": 6.19
+    },
+    {
+      "epoch": 8,
+      "training_loss": 0.12596624909932888,
+      "validation_loss": 0.2684173285961151,
+      "seconds": 6.2
+    },
+    {
+      "epoch": 9,
+      "training_loss": 0.10229446166124775,
+      "validation_loss": 0.2618975341320038,
+      "seconds": 6.3
+    },
+    {
+      "epoch": 10,
+      "training_loss": 0.09091401534463892,
+      "validation_loss": 0.2505011260509491,
+      "seconds": 6.5
+    },
+    {
+      "epoch": 11,
+      "training_loss": 0.06427168269552777,
+      "validation_loss": 0.2512483298778534,
+      "seconds": 6.25
+    },
+    {
+      "epoch": 12,
+      "training_loss": 0.08209832941167917,
+      "validation_loss": 0.26716578006744385,
+      "seconds": 6.61
+    },
+    {
+      "epoch": 13,
+      "training_loss": 0.04760474940041202,
+      "validation_loss": 0.26450464129447937,
+      "seconds": 6.26
+    },
+    {
+      "epoch": 14,
+      "training_loss": 0.030718210991004004,
+      "validation_loss": 0.3351168632507324,
+      "seconds": 6.22
+    },
+    {
+      "epoch": 15,
+      "training_loss": 0.022352629738986194,
+      "validation_loss": 0.3050430417060852,
+      "seconds": 6.45
+    }
+  ],
+  "training": {
+    "epochs": 15,
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "device": "cpu",
+    "threads": 4,
+    "initialization": "ImageNet",
+    "seconds": 103.14
+  },
+  "environment": {
+    "python": "3.12.10",
+    "torch": "2.15.0+cpu"
+  },
+  "dataset": {
+    "source": "https://data.mendeley.com/datasets/mhjyrn35p4/2",
+    "license": "CC BY 4.0",
+    "attribution": "Chandrashekar H S, Geetha Kiran A, Murali S, Dinesh M S, Nanditha B R (2021), Oral Images Dataset, Version 2, doi:10.17632/mhjyrn35p4.2",
+    "original_images": 323,
+    "eligible_original_images": 285,
+    "excluded_for_dimensions": 38,
+    "augmented_files_used": false
+  },
+  "checkpoint_sha256": "17d2779d6e76e1b8f79405c766da9a33b7f80d72c337acecd64b7c3337bec9cb",
+  "verification": {
+    "ml_tests_passed": 12,
+    "provider_tests_passed": 16,
+    "production_build": "passed",
+    "trained_checkpoint_cli_and_http": "passed",
+    "full_regression_suite": "Blocked by pre-existing missing supabase/migrations/202611020013_patient_report.sql"
+  }
+}

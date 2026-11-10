@@ -5,7 +5,16 @@ export interface ServiceStatus {
   video: boolean;
   video_provider?: "livekit" | "daily" | "disabled";
   ai: boolean;
-  ai_provider?: "mock" | "research" | "gemini" | "medgemma" | "disabled";
+  oral_model_ready?: boolean;
+  oral_model_version?: string | null;
+  ai_provider?:
+    | "mock"
+    | "local"
+    | "research"
+    | "gemini"
+    | "medgemma"
+    | "clinical"
+    | "disabled";
   reminders: boolean;
 }
 export type VideoAccess =

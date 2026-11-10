@@ -83,7 +83,7 @@ export interface Analysis {
   research_label: string;
   score?: number | null;
   findings?: {
-    engine: "gemini" | "medgemma";
+    engine: "gemini" | "medgemma" | "clinical";
     language?: Language;
     prompt_version: string;
     image_kind: "oral_photo" | "not_oral_photo" | "uncertain";

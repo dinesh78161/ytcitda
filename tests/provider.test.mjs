@@ -4,7 +4,9 @@ import { createServices } from "../server/index.mjs";
 import { TokenVerifier } from "livekit-server-sdk";
 import { analyzeWithGemini } from "../server/gemini.mjs";
 import { setTimeout as delay } from "node:timers/promises";
-function harness(overrides = {}, providerResponse) {
+import { createLocalOralModel } from "../server/local-oral-model.mjs";
+import jpeg from "jpeg-js";
+function harness(overrides = {}, providerResponse, options = {}) {
   const person = crypto.randomUUID(),
     actor = crypto.randomUUID(),
     appointment = crypto.randomUUID(),
@@ -110,7 +112,8 @@ function harness(overrides = {}, providerResponse) {
     calls.push({ url, options, body });
     if (
       providerResponse &&
-      url.startsWith("https://generativelanguage.googleapis.com/")
+      (url.startsWith("https://generativelanguage.googleapis.com/") ||
+        url === env.CLINICAL_AI_URL)
     )
       return providerResponse(body, options);
     if (options.method === "GET") return new Response("{}", { status: 404 });
@@ -127,7 +130,7 @@ function harness(overrides = {}, providerResponse) {
       score: 0.75,
     });
   };
-  const services = createServices(env, remote, () => client);
+  const services = createServices(env, remote, () => client, options);
   return {
     services,
     client,
@@ -626,4 +629,231 @@ test("analysis sends image bytes without identifiers and stores research-only re
     () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
     (e) => e.status === 403,
   );
+});
+
+test("bundled oral model completes authorized image analysis without any external model request", async () => {
+  const engine = createLocalOralModel();
+  try {
+    const h = harness({ SCREENING_AI_MODE: "local" }, undefined, {
+      localModel: engine,
+    });
+    await h.services.ready();
+    const bytes = jpeg.encode(
+      { width: 256, height: 256, data: Buffer.alloc(256 * 256 * 4, 128) },
+      85,
+    ).data;
+    h.client.storage.from = () => ({
+      download: async () => ({ data: new Blob([bytes]), error: null }),
+    });
+    assert.equal(h.services.status().ai_provider, "local");
+    const result = await h.services.handle(
+      "/api/analyze",
+      { image_id: h.image },
+      h.ctx,
+    );
+    assert.equal(result.model_version, "oral-mendeley-v1");
+    assert.equal(result.provider, "research");
+    assert.equal(result.clinical_use, false);
+    assert.equal(h.calls.length, 0);
+    assert.equal(
+      h.writes.find((w) => w.table === "ai_analyses").value.research_label,
+      result.research_label,
+    );
+    h.rows.patients[0].is_synthetic = false;
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === 403,
+    );
+  } finally {
+    await engine.close();
+  }
+});
+
+test("an explicitly selected bundled model does not call the configured Gemini provider", async () => {
+  const engine = createLocalOralModel();
+  try {
+    const h = harness(
+      { SCREENING_AI_MODE: "gemini", GEMINI_API_KEY: "fixture-key" },
+      undefined,
+      { localModel: engine },
+    );
+    await h.services.ready();
+    const bytes = jpeg.encode(
+      { width: 256, height: 256, data: Buffer.alloc(256 * 256 * 4, 128) },
+      85,
+    ).data;
+    h.client.storage.from = () => ({
+      download: async () => ({ data: new Blob([bytes]), error: null }),
+    });
+    assert.equal(h.services.status().oral_model_ready, true);
+    const result = await h.services.handle(
+      "/api/analyze",
+      { image_id: h.image, engine: "bundled_oral" },
+      h.ctx,
+    );
+    assert.equal(result.model_version, "oral-mendeley-v1");
+    assert.equal(h.calls.length, 0);
+  } finally {
+    await engine.close();
+  }
+});
+
+function clinicalHarness(response) {
+  const h = harness(
+    {
+      WORKSPACE_MODE: "clinical",
+      SCREENING_AI_MODE: "clinical",
+      CLINICAL_AI_URL: "https://clinical-model.example.invalid/infer",
+      CLINICAL_AI_KEY: "fixture-clinical-key",
+      CLINICAL_AI_MODEL_VERSION: "clinical-fixture-v1",
+    },
+    response ||
+      (() =>
+        Response.json({
+          model_version: "clinical-fixture-v1",
+          intended_use: "clinician_assistance",
+          findings: geminiReport(),
+        })),
+  );
+  h.rows.patients[0].is_synthetic = false;
+  h.rows.consents.push({
+    id: crypto.randomUUID(),
+    patient_id: h.person,
+    purpose: "ai_assistance",
+    granted: true,
+  });
+  h.client.rpc = async () => ({
+    data: { version: 1, mode: "clinical" },
+    error: null,
+  });
+  return h;
+}
+
+test("clinical assistance uses its separate provider, records consent provenance and never signs a diagnosis", async () => {
+  const h = clinicalHarness();
+  assert.equal(h.services.status().ai_provider, "clinical");
+  const result = await h.services.handle(
+    "/api/analyze",
+    { image_id: h.image },
+    h.ctx,
+  );
+  assert.equal(result.provider, "clinical_assistance");
+  assert.equal(result.score, null);
+  assert.equal(result.findings.engine, "clinical");
+  assert.equal(result.requires_clinician_review, true);
+  const saved = h.writes.find((w) => w.table === "ai_analyses").value;
+  assert.equal(saved.assistance_consent_id, h.rows.consents[2].id);
+  assert.equal(saved.requested_by, h.ctx.profile.id);
+  assert.ok(
+    !h.writes.some((w) =>
+      [
+        "clinical_reviews",
+        "treatments",
+        "investigations",
+        "referrals",
+      ].includes(w.table),
+    ),
+  );
+  assert.ok(!JSON.stringify(h.calls[0].body).includes(h.person));
+  assert.ok(!JSON.stringify(h.calls[0].body).includes(h.ctx.profile.id));
+  assert.equal(h.calls[0].url, "https://clinical-model.example.invalid/infer");
+});
+
+test("clinical assistance checks clinician role, migration, AI consent, assignment and quality before contacting a provider", async () => {
+  for (const [change, status] of [
+    [
+      (h) => {
+        h.ctx.profile.role = "health_worker";
+      },
+      403,
+    ],
+    [
+      (h) => {
+        h.rows.consents[2].granted = false;
+      },
+      403,
+    ],
+    [
+      (h) => {
+        h.rows.images[0].quality_status = "recapture";
+      },
+      409,
+    ],
+    [
+      (h) => {
+        h.rows.patients = [];
+      },
+      403,
+    ],
+    [
+      (h) => {
+        h.client.rpc = async () => ({ data: { version: 0 }, error: null });
+      },
+      503,
+    ],
+  ]) {
+    const h = clinicalHarness();
+    change(h);
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === status,
+    );
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.writes.length, 0);
+  }
+});
+
+test("consent withdrawal or loss of assignment during clinical inference prevents saving the draft", async () => {
+  for (const change of [
+    (h) => {
+      h.rows.consents[2].granted = false;
+    },
+    (h) => {
+      h.rows.patients = [];
+    },
+  ]) {
+    let h;
+    h = clinicalHarness(() => {
+      change(h);
+      return Response.json({
+        model_version: "clinical-fixture-v1",
+        intended_use: "clinician_assistance",
+        findings: geminiReport(),
+      });
+    });
+    await assert.rejects(
+      () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+      (e) => e.status === 403,
+    );
+    assert.equal(h.writes.length, 0);
+  }
+});
+
+test("duplicate concurrent clinical analysis is rejected and the slot is released after completion", async () => {
+  let release, entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const blocked = new Promise((resolve) => {
+    release = resolve;
+  });
+  const h = clinicalHarness(async () => {
+    entered();
+    await blocked;
+    return Response.json({
+      model_version: "clinical-fixture-v1",
+      intended_use: "clinician_assistance",
+      findings: geminiReport(),
+    });
+  });
+  const first = h.services.handle("/api/analyze", { image_id: h.image }, h.ctx);
+  await started;
+  await assert.rejects(
+    () => h.services.handle("/api/analyze", { image_id: h.image }, h.ctx),
+    (e) => e.status === 429,
+  );
+  release();
+  await first;
+  await h.services.handle("/api/analyze", { image_id: h.image }, h.ctx);
+  assert.equal(h.calls.length, 2);
 });

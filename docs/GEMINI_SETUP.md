@@ -1,5 +1,8 @@
 # Enable Gemini image analysis
 
+For real-patient clinician assistance, see [Clinical AI](CLINICAL_AI.md). The
+Gemini Developer API path described here remains limited to evaluation data.
+
 The app can use Gemini's existing image-understanding capability without training
 an oral classifier first. It requests visible findings, possible conditions for a
 clinician to consider, and limitations. It does not establish a diagnosis, estimate
