@@ -132,7 +132,7 @@ test("clinical pages use signed-in roles and show actual clinician-led workflows
 }) => {
   await clinic(page);
   await expect(
-    page.getByRole("heading", { name: "A clearer path to care.", exact: true }),
+    page.getByRole("heading", { name: "A clearer path to Oral care", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Clinical workspace", { exact: true }),

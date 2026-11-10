@@ -45,7 +45,7 @@ export const labels = {
   workspace: ["CARE WORKSPACE", "సంరక్షణ కేంద్రం"],
   programme: ["AAROHAN 2026 · ITDA PADERU", "ఆరోహణ్ 2026 · ఐటీడీఏ పాడేరు"],
   tagline: ["Community care, connected.", "సమాజ ఆరోగ్యానికి అనుసంధానం."],
-  hello: ["A clearer path to care.", "మెరుగైన సంరక్షణకు స్పష్టమైన మార్గం."],
+  hello: ["A clearer path to Oral care", "మెరుగైన సంరక్షణకు స్పష్టమైన మార్గం."],
   intro: [
     "Every screening is a first step. Keep the next one within reach.",
     "ప్రతి పరీక్ష ఒక తొలి అడుగు. తదుపరి సంరక్షణను అందుబాటులో ఉంచండి.",

@@ -1,7 +1,7 @@
 export const scenes = [
   {
     seconds: 20,
-    title: "A clearer path to care",
+    title: "A clearer path to Oral care",
     image: "dashboard-desktop.png",
     points: [
       "AAROHAN 2026",

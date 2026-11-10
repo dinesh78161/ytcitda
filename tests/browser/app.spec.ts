@@ -133,7 +133,7 @@ test("dashboard, registration, doctor referral, booking and simulated outcome", 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A clearer path to care." }),
+    page.getByRole("heading", { name: "A clearer path to Oral care" }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/dashboard-desktop.png",
@@ -378,14 +378,14 @@ test("offline registration survives reload and reconnects exactly once", async (
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A clearer path to care." }),
+    page.getByRole("heading", { name: "A clearer path to Oral care" }),
   ).toBeVisible();
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "A clearer path to care." }),
+    page.getByRole("heading", { name: "A clearer path to Oral care" }),
   ).toBeVisible();
   await context.setOffline(true);
   await register(page, "Synthetic Offline Patient");
@@ -419,7 +419,7 @@ test("Telugu mobile navigation, registration labels and no page overflow", async
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A clearer path to care." }),
+    page.getByRole("heading", { name: "A clearer path to Oral care" }),
   ).toBeVisible();
   await page.locator(".language-picker select").selectOption("te");
   await expect(

@@ -29,7 +29,7 @@ for (const [code, nativeName] of languages) {
     await expect(page.locator("html")).toHaveAttribute("lang", code);
     await expect(
       page.getByRole("heading", {
-        name: text("A clearer path to care."),
+        name: text("A clearer path to Oral care"),
         exact: true,
       }),
     ).toBeVisible();
@@ -140,7 +140,7 @@ for (const [code, nativeName] of languages) {
       await expect(page.locator(".language-picker select")).toHaveValue("hi");
       await expect(
         page.getByRole("heading", {
-          name: text("A clearer path to care."),
+          name: text("A clearer path to Oral care"),
           exact: true,
         }),
       ).toBeVisible();
