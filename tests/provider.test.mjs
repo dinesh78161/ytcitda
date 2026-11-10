@@ -312,6 +312,7 @@ test("Gemini receives only image data and returns persisted observations without
     () => geminiResponse(),
   );
   assert.equal(h.services.status().ai_provider, "gemini");
+  assert.equal(h.services.status().ai_model, "gemini-3.5-flash-lite");
   const result = await h.services.handle(
     "/api/analyze",
     { image_id: h.image },

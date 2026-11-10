@@ -56,6 +56,10 @@ export function createServices(
     : null;
   const aiMode =
     env.SCREENING_AI_MODE || (env.SCREENING_MODEL_URL ? "research" : "mock");
+  const visionModel =
+    env.GEMINI_MODEL ||
+    env.MEDGEMMA_MODEL ||
+    (aiMode === "medgemma" ? MEDGEMMA_DEFAULT_MODEL : GEMINI_DEFAULT_MODEL);
   requireValue(
     [
       "mock",
@@ -111,6 +115,9 @@ export function createServices(
       aiEnabled && (!localModel || localModel.status().ready)
         ? aiMode
         : "disabled",
+    ...(["gemini", "medgemma"].includes(aiMode) && aiEnabled
+      ? { ai_model: visionModel }
+      : {}),
     ...(localModel
       ? {
           oral_model_ready: localModel.status().ready,
@@ -646,12 +653,7 @@ export function createServices(
           result = await analyzeWithGemini({
             bytes: await blob.arrayBuffer(),
             key: env.GEMINI_API_KEY,
-            model:
-              env.GEMINI_MODEL ||
-              env.MEDGEMMA_MODEL ||
-              (aiMode === "medgemma"
-                ? MEDGEMMA_DEFAULT_MODEL
-                : GEMINI_DEFAULT_MODEL),
+            model: visionModel,
             language: body.language ?? "en",
             fetcher,
             engine: aiMode === "medgemma" ? "medgemma" : "gemini",
