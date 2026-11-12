@@ -43,8 +43,10 @@ flowchart LR
 The browser is never trusted to set a role or bypass patient assignment. Supabase
 checks active profile and assignment on reads and writes. The Node API independently
 verifies the bearer token and file/video consent. Provider and service secrets stay
-on the server. Application assets are cached by the PWA; private files and cloud
-responses are not cached for offline reading.
+on the server. Application assets are cached by the PWA. Health worker intake
+drafts, queued oral photographs and a limited snapshot of their own screenings
+and consent use encrypted IndexedDB for offline capture. Reports, signed clinical
+notes, remote file URLs and AI results are excluded. See [Offline capture](OFFLINE_CAPTURE.md).
 
 ```mermaid
 erDiagram

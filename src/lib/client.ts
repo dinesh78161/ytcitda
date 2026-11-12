@@ -11,6 +11,7 @@ export const isClinical = import.meta.env.VITE_WORKSPACE_MODE === "clinical";
 export const isCloud = appMode !== "demo";
 const url = import.meta.env.VITE_SUPABASE_URL ?? "",
   key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+export const offlineScope = `${url}|${isClinical ? "clinical" : "evaluation"}`;
 const valid =
   url.startsWith("https://") &&
   !url.includes("YOUR_") &&

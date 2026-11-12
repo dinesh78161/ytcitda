@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Field, Modal, useApp } from "./App";
 import { message } from "./lib/use-workspace";
-import { isClinical } from "./lib/client";
 import { habits, normalizeIntake, optionLabel, symptoms } from "./lib/intake";
 import { ASR_MANDALS, type HabitationItem } from "./lib/asr-districts";
 
@@ -307,7 +306,10 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                       type="tel"
                       maxLength={20}
                       value={String(form.contact_phone)}
-                      placeholder={copy("10-digit mobile number", "10 అంకెల మొబైల్ సంఖ్య")}
+                      placeholder={copy(
+                        "10-digit mobile number",
+                        "10 అంకెల మొబైల్ సంఖ్య",
+                      )}
                       onChange={(e) => change("contact_phone", e.target.value)}
                     />
                   </Field>
@@ -329,7 +331,9 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                           mandal: newMandalId,
                           habitation: "",
                           custom_habitation: "",
-                          village: form.village ? form.village : mandalInfo.nameEn,
+                          village: form.village
+                            ? form.village
+                            : mandalInfo.nameEn,
                         });
                       }}
                     >
@@ -376,7 +380,10 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                         </option>
                       ))}
                       <option value="other">
-                        {copy("Other / Custom Habitation", "ఇతర నివాసం (టైప్ చేయండి)")}
+                        {copy(
+                          "Other / Custom Habitation",
+                          "ఇతర నివాసం (టైప్ చేయండి)",
+                        )}
                       </option>
                     </select>
                   </Field>
@@ -399,7 +406,9 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                           const val = e.target.value;
                           update({
                             custom_habitation: val,
-                            village: val ? `${val}, ${currentMandal.nameEn}` : currentMandal.nameEn,
+                            village: val
+                              ? `${val}, ${currentMandal.nameEn}`
+                              : currentMandal.nameEn,
                           });
                         }}
                       />
@@ -689,7 +698,9 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
                     </div>
                     <div>
                       <dt>{copy("ASR Mandal", "మండలం")}</dt>
-                      <dd>{currentMandal.nameEn} · {currentMandal.nameTe}</dd>
+                      <dd>
+                        {currentMandal.nameEn} · {currentMandal.nameTe}
+                      </dd>
                     </div>
                     <div>
                       <dt>{copy("Habitation", "నివాసం")}</dt>
@@ -794,12 +805,10 @@ export default function ScreeningIntake({ onClose }: { onClose: () => void }) {
               ? t("saving")
               : draftSaved
                 ? t("draftSaved")
-                : isClinical
-                  ? t("draftSaved")
-                  : copy(
-                      "Draft saves as you type",
-                      "నమోదు చేస్తున్నప్పుడు డ్రాఫ్ట్ సేవ్ అవుతుంది",
-                    )}
+                : copy(
+                    "Draft saves as you type",
+                    "నమోదు చేస్తున్నప్పుడు డ్రాఫ్ట్ సేవ్ అవుతుంది",
+                  )}
           </span>
           <button
             type="button"

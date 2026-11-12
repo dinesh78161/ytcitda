@@ -41,9 +41,10 @@ Keep `VITE_APP_MODE=demo` set in the terminal, build with `npm run build`, then
 `npm run preview` and visit http://127.0.0.1:4173
 once online. Disconnect, register a synthetic patient, reload, reconnect, and verify
 one patient record. The app shell and fonts are cached. Cloud registration needs an
-existing session and server acknowledgement on reconnect; private cloud records
-are not cached for offline reading. Test Android camera and installation on a real
-device separately. The automated mobile checks use a 390 px browser viewport.
+existing session and server acknowledgement on reconnect. Cloud health workers
+can also queue consented photographs and reopen their encrypted drafts offline;
+see [Offline capture](OFFLINE_CAPTURE.md). Test Android camera and installation
+on a real device separately. The automated mobile checks use a 390 px browser viewport.
 
 ## Integration acceptance
 

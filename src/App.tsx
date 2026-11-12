@@ -196,7 +196,7 @@ export default function App() {
     const focusable = () =>
       Array.from(
         drawer?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), a[href], select:not(:disabled)',
+          "button:not(:disabled), a[href], select:not(:disabled)",
         ) ?? [],
       );
     drawer?.querySelector<HTMLButtonElement>(".mobile-nav-close")?.focus();
@@ -235,7 +235,8 @@ export default function App() {
       ? navItems.filter((n) => ["overview", "reports"].includes(n.id))
       : navItems.filter((n) => {
           if (n.id === "reports") return clinician(w.profile?.role);
-          if (n.id === "screenings" && w.profile?.role === "navigator") return false;
+          if (n.id === "screenings" && w.profile?.role === "navigator")
+            return false;
           return true;
         });
   const pageLabel = (id: Page) =>
@@ -363,7 +364,9 @@ export default function App() {
                 <span className="breadcrumb">
                   {t("workspace")}
                   <ChevronRight size={14} />
-                  <strong>{selected ? t("patientRecord") : pageLabel(page)}</strong>
+                  <strong>
+                    {selected ? t("patientRecord") : pageLabel(page)}
+                  </strong>
                 </span>
                 {isClinical && (
                   <small className="workspace-mode">
@@ -1267,8 +1270,16 @@ export function Modal({
               onClick={() => setMaximized((v) => !v)}
               title={
                 maximized
-                  ? localize(lang, "Restore standard size", "సాధారణ పరిమాణానికి మార్చు")
-                  : localize(lang, "Maximize screen", "పూర్తి స్క్రీన్‌కు మార్చు")
+                  ? localize(
+                      lang,
+                      "Restore standard size",
+                      "సాధారణ పరిమాణానికి మార్చు",
+                    )
+                  : localize(
+                      lang,
+                      "Maximize screen",
+                      "పూర్తి స్క్రీన్‌కు మార్చు",
+                    )
               }
               aria-label={maximized ? "Restore view" : "Maximize view"}
             >
@@ -1371,7 +1382,7 @@ function PatientDetail({
         percent: 70,
         previewUrl: result.preview || objectUrl,
       });
-      await w.execute("image", {
+      const saved = await w.execute("image", {
         patient_id: patient.id,
         oral_view: viewToUse,
         ...result,
@@ -1382,7 +1393,13 @@ function PatientDetail({
         previewUrl: result.preview || objectUrl,
       });
       notify(
-        t(result.quality_status === "acceptable" ? "acceptable" : "recapture"),
+        t(
+          saved === "queued"
+            ? "draftQueued"
+            : result.quality_status === "acceptable"
+              ? "acceptable"
+              : "recapture",
+        ),
       );
     } catch (e) {
       notify(message(e), true);
@@ -1412,7 +1429,9 @@ function PatientDetail({
       setImageBusy(true);
       setSelectedSubsiteFilter("all");
       for (const sample of CLINICAL_SAMPLES) {
-        const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+        const alreadyHasImage = images.some((img) =>
+          matchesSubsite(img, sample.id),
+        );
         if (!alreadyHasImage) {
           const file = await getSampleFile(sample.id);
           const result = await inspectImage(file);
@@ -1441,7 +1460,10 @@ function PatientDetail({
     if (images.length > 0 && tab === "photos" && galleryRef.current) {
       const rect = galleryRef.current.getBoundingClientRect();
       if (rect.top > 250 || rect.top < 0) {
-        galleryRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        galleryRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
       }
     }
   }, [images.length, selectedSubsiteFilter, tab]);
@@ -1457,6 +1479,11 @@ function PatientDetail({
         subtitle={`${shortId(patient.id)} · ${patient.age_years} ${t("years")} · ${patient.village}${patient.habitation ? ` (${patient.habitation})` : ""}${patient.subcenter ? ` · ${patient.subcenter}` : ""}`}
         action={screening ? <Badge status={screening.status} /> : null}
       />
+      {w.drafts.some((d) => d.payload.patient_id === patient.id) && (
+        <p className="form-notice" role="status">
+          {t("draftQueued")}
+        </p>
+      )}
       <GuidedJourney
         patient={patient}
         onNavigate={(target) => {
@@ -1553,7 +1580,9 @@ function PatientDetail({
                           onChange={(e) => {
                             const val = e.target.value;
                             setOralView(val);
-                            if (images.some((img) => matchesSubsite(img, val))) {
+                            if (
+                              images.some((img) => matchesSubsite(img, val))
+                            ) {
                               setSelectedSubsiteFilter(val);
                             }
                           }}
@@ -1595,7 +1624,9 @@ function PatientDetail({
                         <div className="sample-options-grid">
                           {CLINICAL_SAMPLES.map((sample) => {
                             const isSelected = oralView === sample.id;
-                            const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+                            const alreadyHasImage = images.some((img) =>
+                              matchesSubsite(img, sample.id),
+                            );
                             return (
                               <button
                                 key={sample.id}
@@ -1612,18 +1643,30 @@ function PatientDetail({
                                 disabled={imageBusy || w.busy}
                                 title={`${sample.titleEn} (${sample.titleTe})`}
                               >
-                                <div className="sample-option-icon">{sample.icon}</div>
+                                <div className="sample-option-icon">
+                                  {sample.icon}
+                                </div>
                                 <div className="sample-option-text">
                                   <strong>{sample.titleEn}</strong>
                                   <small>{sample.titleTe}</small>
                                 </div>
                                 {alreadyHasImage ? (
                                   <span className="sample-status-pill done">
-                                    ✓ {localize(lang, "Photo Ready", "సిద్ధంగా ఉంది")}
+                                    ✓{" "}
+                                    {localize(
+                                      lang,
+                                      "Photo Ready",
+                                      "సిద్ధంగా ఉంది",
+                                    )}
                                   </span>
                                 ) : (
                                   <span className="sample-status-pill load">
-                                    + {localize(lang, "Load & Analyse", "లోడ్ & విశ్లేషించు")}
+                                    +{" "}
+                                    {localize(
+                                      lang,
+                                      "Load & Analyse",
+                                      "లోడ్ & విశ్లేషించు",
+                                    )}
                                   </span>
                                 )}
                               </button>
@@ -1640,7 +1683,10 @@ function PatientDetail({
                         "ప్రాథమిక అనుమానాస్పద గాయం యొక్క 1 స్పష్టమైన చిత్రం AI విశ్లేషణ & రిఫరల్‌కు పూర్తిగా సరిపోతుంది. వేర్వేరు ప్రదేశాల్లో గాయాలు ఉన్నప్పుడు మాత్రమే బహుళ ఫోటోలు అవసరం.",
                       )}
                     </div>
-                    {isCloud && !w.services.files ? (
+                    {isCloud &&
+                    w.online &&
+                    !w.services.files &&
+                    w.profile?.role !== "health_worker" ? (
                       <div className="empty">
                         <Camera size={30} />
                         <p>{t("cloudPhoto")}</p>
@@ -1698,7 +1744,11 @@ function PatientDetail({
                                   )}
                                 </strong>
                                 <span className="badge badge-subtle">
-                                  {localize(lang, "File upload", "ఫైల్ అప్‌లోడ్")}
+                                  {localize(
+                                    lang,
+                                    "File upload",
+                                    "ఫైల్ అప్‌లోడ్",
+                                  )}
                                 </span>
                               </div>
                               <span>
@@ -1742,7 +1792,11 @@ function PatientDetail({
                                   )}
                                 </strong>
                                 <span className="badge badge-accent">
-                                  {localize(lang, "Preset AI Sample", "నమూనా AI చిత్రం")}
+                                  {localize(
+                                    lang,
+                                    "Preset AI Sample",
+                                    "నమూనా AI చిత్రం",
+                                  )}
                                 </span>
                               </div>
                               <span>
@@ -1768,8 +1822,12 @@ function PatientDetail({
                           {images.length}{" "}
                           {localize(
                             lang,
-                            images.length === 1 ? "photo attached" : "photos attached",
-                            images.length === 1 ? "చిత్రం ఉంది" : "చిత్రాలు ఉన్నాయి",
+                            images.length === 1
+                              ? "photo attached"
+                              : "photos attached",
+                            images.length === 1
+                              ? "చిత్రం ఉంది"
+                              : "చిత్రాలు ఉన్నాయి",
                           )}
                         </span>
                       </div>
@@ -1781,11 +1839,17 @@ function PatientDetail({
                           disabled={imageBusy || w.busy}
                         >
                           <Camera size={14} />
-                          <span>{localize(lang, "Live Cam", "లైవ్ కెమెరా")}</span>
+                          <span>
+                            {localize(lang, "Live Cam", "లైవ్ కెమెరా")}
+                          </span>
                         </button>
-                        <label className={`button small compact-upload-btn ${imageBusy ? "disabled" : ""}`}>
+                        <label
+                          className={`button small compact-upload-btn ${imageBusy ? "disabled" : ""}`}
+                        >
                           <UploadCloud size={14} />
-                          <span>{localize(lang, "Upload Photo", "ఫోటో అప్‌లోడ్")}</span>
+                          <span>
+                            {localize(lang, "Upload Photo", "ఫోటో అప్‌లోడ్")}
+                          </span>
                           <input
                             aria-label={t("capture")}
                             type="file"
@@ -1805,20 +1869,32 @@ function PatientDetail({
                           className="button small compact-sample-btn"
                           onClick={() => void loadSample(oralView)}
                           disabled={imageBusy || w.busy}
-                          title={localize(lang, "Load Reference Clinical Photo for current site", "ప్రస్తుత భాగానికి నమూనా ఫోటో లోడ్ చేయండి")}
+                          title={localize(
+                            lang,
+                            "Load Reference Clinical Photo for current site",
+                            "ప్రస్తుత భాగానికి నమూనా ఫోటో లోడ్ చేయండి",
+                          )}
                         >
                           <Sparkles size={14} />
-                          <span>{localize(lang, "Load Sample", "నమూనా లోడ్")}</span>
+                          <span>
+                            {localize(lang, "Load Sample", "నమూనా లోడ్")}
+                          </span>
                         </button>
                         <button
                           type="button"
                           className="button small compact-all-btn"
                           onClick={() => void loadAllSamples()}
                           disabled={imageBusy || w.busy}
-                          title={localize(lang, "Load All 6 Anatomical Photos", "అన్ని 6 భాగాల ఫోటోలను లోడ్ చేయండి")}
+                          title={localize(
+                            lang,
+                            "Load All 6 Anatomical Photos",
+                            "అన్ని 6 భాగాల ఫోటోలను లోడ్ చేయండి",
+                          )}
                         >
                           <Zap size={14} />
-                          <span>{localize(lang, "All 6 Sites", "అన్ని 6 భాగాలు")}</span>
+                          <span>
+                            {localize(lang, "All 6 Sites", "అన్ని 6 భాగాలు")}
+                          </span>
                         </button>
                         <button
                           type="button"
@@ -1826,7 +1902,9 @@ function PatientDetail({
                           onClick={() => setShowFullSampleDeck((v) => !v)}
                         >
                           <span>{showFullSampleDeck ? "▲" : "▼"}</span>
-                          <span>{localize(lang, "Sample Deck", "నమూనాలు")}</span>
+                          <span>
+                            {localize(lang, "Sample Deck", "నమూనాలు")}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -1848,7 +1926,9 @@ function PatientDetail({
                         <div className="sample-options-grid">
                           {CLINICAL_SAMPLES.map((sample) => {
                             const isSelected = oralView === sample.id;
-                            const alreadyHasImage = images.some((img) => matchesSubsite(img, sample.id));
+                            const alreadyHasImage = images.some((img) =>
+                              matchesSubsite(img, sample.id),
+                            );
                             return (
                               <button
                                 key={sample.id}
@@ -1864,18 +1944,30 @@ function PatientDetail({
                                 disabled={imageBusy || w.busy}
                                 title={`${sample.titleEn} (${sample.titleTe})`}
                               >
-                                <div className="sample-option-icon">{sample.icon}</div>
+                                <div className="sample-option-icon">
+                                  {sample.icon}
+                                </div>
                                 <div className="sample-option-text">
                                   <strong>{sample.titleEn}</strong>
                                   <small>{sample.titleTe}</small>
                                 </div>
                                 {alreadyHasImage ? (
                                   <span className="sample-status-pill done">
-                                    ✓ {localize(lang, "Photo Ready", "సిద్ధంగా ఉంది")}
+                                    ✓{" "}
+                                    {localize(
+                                      lang,
+                                      "Photo Ready",
+                                      "సిద్ధంగా ఉంది",
+                                    )}
                                   </span>
                                 ) : (
                                   <span className="sample-status-pill load">
-                                    + {localize(lang, "Load & Analyse", "లోడ్ & విశ్లేషించు")}
+                                    +{" "}
+                                    {localize(
+                                      lang,
+                                      "Load & Analyse",
+                                      "లోడ్ & విశ్లేషించు",
+                                    )}
                                   </span>
                                 )}
                               </button>
@@ -1999,10 +2091,13 @@ function PatientDetail({
                       className={`subsite-pill ${selectedSubsiteFilter === "all" ? "active" : ""}`}
                       onClick={() => setSelectedSubsiteFilter("all")}
                     >
-                      {localize(lang, "All Sub-sites", "అన్ని భాగాలు")} ({images.length})
+                      {localize(lang, "All Sub-sites", "అన్ని భాగాలు")} (
+                      {images.length})
                     </button>
                     {ANATOMICAL_SUB_SITES.map((site) => {
-                      const count = images.filter((img) => matchesSubsite(img, site.id)).length;
+                      const count = images.filter((img) =>
+                        matchesSubsite(img, site.id),
+                      ).length;
                       return (
                         <button
                           key={site.id}
@@ -2014,7 +2109,9 @@ function PatientDetail({
                           }}
                         >
                           <span>{site.en}</span>
-                          <span className={`subsite-count-badge ${count > 0 ? "count-active" : ""}`}>
+                          <span
+                            className={`subsite-count-badge ${count > 0 ? "count-active" : ""}`}
+                          >
                             {count}
                           </span>
                         </button>
@@ -2023,9 +2120,14 @@ function PatientDetail({
                   </div>
                 )}
                 <div ref={galleryRef} className="photo-grid analysis-gallery">
-                  {images.filter((img) => matchesSubsite(img, selectedSubsiteFilter)).length === 0 ? (
+                  {images.filter((img) =>
+                    matchesSubsite(img, selectedSubsiteFilter),
+                  ).length === 0 ? (
                     <div className="empty-subsite-placeholder">
-                      <Sparkles size={24} style={{ color: "#2563eb", marginBottom: "6px" }} />
+                      <Sparkles
+                        size={24}
+                        style={{ color: "#2563eb", marginBottom: "6px" }}
+                      />
                       <p>
                         {localize(
                           lang,
@@ -2041,7 +2143,11 @@ function PatientDetail({
                           disabled={imageBusy || w.busy}
                         >
                           <Sparkles size={14} />
-                          {localize(lang, "Load Reference Photo & Analyse", "నమూనా లోడ్ చేసి విశ్లేషించండి")}
+                          {localize(
+                            lang,
+                            "Load Reference Photo & Analyse",
+                            "నమూనా లోడ్ చేసి విశ్లేషించండి",
+                          )}
                         </button>
                         <button
                           type="button"
@@ -2053,13 +2159,19 @@ function PatientDetail({
                           disabled={imageBusy || w.busy}
                         >
                           <Camera size={14} />
-                          {localize(lang, "Take Live Photo", "లైవ్ ఫోటో తీయండి")}
+                          {localize(
+                            lang,
+                            "Take Live Photo",
+                            "లైవ్ ఫోటో తీయండి",
+                          )}
                         </button>
                       </div>
                     </div>
                   ) : (
                     images
-                      .filter((img) => matchesSubsite(img, selectedSubsiteFilter))
+                      .filter((img) =>
+                        matchesSubsite(img, selectedSubsiteFilter),
+                      )
                       .map((image) => (
                         <OralAnalysis
                           key={image.id}
@@ -2289,7 +2401,8 @@ function PatientDetail({
                     </button>
                   </form>
                 ) : (
-                  !isClinician && screening?.status === "awaiting_clinician" && (
+                  !isClinician &&
+                  screening?.status === "awaiting_clinician" && (
                     <div className="form-notice">
                       <Stethoscope size={19} />
                       {t("awaitingClinicianReview")}
@@ -2854,7 +2967,11 @@ function WorkspaceSettings() {
           ) : (
             w.drafts.map((d) => (
               <div key={d.id} className="draft-row">
-                <strong>{String(d.payload.display_name)}</strong>
+                <strong>
+                  {d.action === "image"
+                    ? `${t("photos")} · ${w.data.patients.find((p) => p.id === d.payload.patient_id)?.display_name ?? String(d.payload.patient_id)}`
+                    : String(d.payload.display_name)}
+                </strong>
                 <Badge status={d.status} />
                 {d.error && <p className="error-text">{d.error}</p>}
               </div>

@@ -110,12 +110,13 @@ An environment switch does not make the existing model clinically validated.
 
 ## Browser drafts
 
-Clinical registration drafts stay in memory for the signed-in session. Identifiable
-draft fields and retry payloads are not written to the app's browser database.
-There is no clinical offline submission queue or automatic retry. Saving requires
-a connection; reload and sign-out discard unsaved drafts. Language preferences
-and the authenticated session can still be persisted by the browser. The app does
-not claim that all browser storage or camera captures are encrypted.
+Health worker registration drafts and captured oral photographs are encrypted in
+device storage and can be queued offline, including across reloads. Reconnect
+with the same account to sync registrations before their dependent photographs.
+Other clinical changes still require a connection. Sign-out removes the worker
+snapshot and unfinished form; queued records remain available to the same account
+after signing in online. See [Offline capture](OFFLINE_CAPTURE.md) for session
+limits, storage boundaries, recovery and verification.
 
 ## Software verification
 

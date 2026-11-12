@@ -66,5 +66,8 @@
   "Analyse image": "చిత్రాన్ని విశ్లేషించండి",
   "For clinician review": "వైద్యుని సమీక్ష కోసం",
   "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "సేవ్ చేసిన తర్వాత నోటి చిత్రాలను జోడించడానికి రోగి రికార్డు తెరవండి. అప్‌లోడ్ చేయడానికి ముందు చిత్ర సమ్మతి నమోదు చేయండి.",
-  "File uploads are unavailable. Contact your workspace administrator.": "ఫైళ్ల అప్‌లోడ్ అందుబాటులో లేదు. మీ కార్యస్థల నిర్వాహకుడిని సంప్రదించండి."
+  "File uploads are unavailable. Contact your workspace administrator.": "ఫైళ్ల అప్‌లోడ్ అందుబాటులో లేదు. మీ కార్యస్థల నిర్వాహకుడిని సంప్రదించండి.",
+  "Offline capture queue": "ఆఫ్‌లైన్ నమోదు మరియు చిత్రాల జాబితా",
+  "Sync pending records": "పెండింగ్ రికార్డులను పంపండి",
+  "No pending records": "పెండింగ్ రికార్డులు లేవు"
 }

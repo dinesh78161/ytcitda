@@ -257,9 +257,9 @@ export const labels = {
     "Contact your workspace administrator for connection and staff access settings.",
     "కనెక్షన్ మరియు సిబ్బంది ప్రవేశ సెట్టింగ్‌ల కోసం నిర్వాహకుడిని సంప్రదించండి.",
   ],
-  drafts: ["Offline registration queue", "ఆఫ్‌లైన్ నమోదు జాబితా"],
-  sync: ["Retry pending registrations", "పెండింగ్ నమోదులను మళ్లీ పంపండి"],
-  noDrafts: ["No pending registrations", "పెండింగ్ నమోదులు లేవు"],
+  drafts: ["Offline capture queue", "ఆఫ్‌లైన్ నమోదు మరియు చిత్రాల జాబితా"],
+  sync: ["Sync pending records", "పెండింగ్ రికార్డులను పంపండి"],
+  noDrafts: ["No pending records", "పెండింగ్ రికార్డులు లేవు"],
   queuedHelp: [
     "Queued records stay on this device until acknowledged. Failed entries are retained for retry.",
     "నిర్ధారణ వచ్చే వరకు రికార్డులు ఈ పరికరంలో ఉంటాయి. విఫలమైనవి మళ్లీ పంపడానికి ఉంచుతాం.",
@@ -319,8 +319,8 @@ export const clinicalLabels: Partial<Record<Label, readonly [string, string]>> =
     pathology: ["Diagnostic investigations", "నిర్ధారణ పరీక్షలు"],
     saveOutcome: ["Save diagnostic outcome", "నిర్ధారణ ఫలితాన్ని సేవ్ చేయండి"],
     draftSaved: [
-      "Changes held for this session",
-      "ఈ సెషన్‌లో మార్పులు ఉంచబడ్డాయి",
+      "Draft saved on this device",
+      "డ్రాఫ్ట్ ఈ పరికరంలో సేవ్ అయింది",
     ],
     drafts: ["Pending submissions", "పెండింగ్ సమర్పణలు"],
     cloudHelp: [

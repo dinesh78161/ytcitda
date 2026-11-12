@@ -804,5 +804,8 @@
   "Analyse image": "ছবি বিশ্লেষণ করুন",
   "For clinician review": "চিকিৎসকের পর্যালোচনার জন্য",
   "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "সংরক্ষণের পরে মুখের ছবি যোগ করতে রোগীর রেকর্ড খুলুন। আপলোড করার আগে ছবির সম্মতি নথিভুক্ত করুন।",
-  "File uploads are unavailable. Contact your workspace administrator.": "ফাইল আপলোড উপলব্ধ নেই। আপনার কর্মক্ষেত্রের প্রশাসকের সঙ্গে যোগাযোগ করুন।"
+  "File uploads are unavailable. Contact your workspace administrator.": "ফাইল আপলোড উপলব্ধ নেই। আপনার কর্মক্ষেত্রের প্রশাসকের সঙ্গে যোগাযোগ করুন।",
+  "Offline capture queue": "অফলাইন নথি ও ছবির সারি",
+  "Sync pending records": "অপেক্ষমাণ নথি সিঙ্ক করুন",
+  "No pending records": "কোনো অপেক্ষমাণ নথি নেই"
 }

@@ -58,6 +58,7 @@ export interface Consent {
   recorded_at: string;
 }
 export interface OralImage {
+  pending_sync?: boolean;
   id: string;
   patient_id: string;
   screening_id: string;
@@ -271,11 +272,12 @@ export interface Command {
   created_at: string;
 }
 export interface Draft {
+  action?: "register" | "image";
   id: string;
   actor: string;
   payload: Record<string, unknown>;
   created_at: string;
-  status: "pending" | "failed";
+  status: "pending" | "uploading" | "failed";
   error?: string;
 }
 export const emptyData = (): DataSet => ({

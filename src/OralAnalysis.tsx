@@ -140,7 +140,13 @@ export default function OralAnalysis({
     let live = true;
     setSource(null);
     setPreviewError(false);
-    if (consent && isCloud) {
+    if (
+      consent &&
+      isCloud &&
+      !image.pending_sync &&
+      w.online !== false &&
+      !image.preview
+    ) {
       void careApi<{ url: string }>("download", { kind: "oral", id: image.id })
         .then(({ url }) => {
           if (live) setSource(url);
@@ -152,7 +158,14 @@ export default function OralAnalysis({
     return () => {
       live = false;
     };
-  }, [image.id, consent, previewAttempt]);
+  }, [
+    image.id,
+    consent,
+    previewAttempt,
+    image.pending_sync,
+    image.preview,
+    w.online,
+  ]);
   const imageSource = consent && !previewError ? image.preview || source : null;
   const measurement = (key: string, unit = "") =>
     typeof quality?.[key] === "number" ? `${quality[key]}${unit}` : "—";
@@ -194,10 +207,17 @@ export default function OralAnalysis({
       aria-label={copy("Oral image analysis", "నోటి చిత్ర విశ్లేషణ")}
     >
       <div className="oral-image-column">
+        {image.pending_sync && (
+          <p className="form-notice" role="status">
+            {t("draftQueued")}
+          </p>
+        )}
         <div className="analysis-image-heading">
           <Camera size={16} />
           <span>
-            {copy("Uploaded oral photograph", "అప్‌లోడ్ చేసిన నోటి చిత్రం")}
+            {image.pending_sync
+              ? t("photos")
+              : copy("Uploaded oral photograph", "అప్‌లోడ్ చేసిన నోటి చిత్రం")}
           </span>
         </div>
         {imageSource ? (
@@ -280,7 +300,7 @@ export default function OralAnalysis({
             {isCloud && (
               <button
                 className="text-button"
-                disabled={!consent}
+                disabled={!consent || image.pending_sync || w.online === false}
                 onClick={() =>
                   void run(async () => {
                     const file = await careApi<{ url: string }>("download", {
@@ -470,6 +490,8 @@ export default function OralAnalysis({
                   className={`button primary analysis-run ${result ? "analysis-run-compact" : ""}`}
                   aria-label={runMock ? t("analyze") : undefined}
                   disabled={
+                    image.pending_sync ||
+                    w.online === false ||
                     w.busy ||
                     analyzing ||
                     !consent ||

@@ -804,5 +804,8 @@
   "Analyse image": "ಚಿತ್ರವನ್ನು ವಿಶ್ಲೇಷಿಸಿ",
   "For clinician review": "ವೈದ್ಯರ ಪರಿಶೀಲನೆಗಾಗಿ",
   "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "ಉಳಿಸಿದ ನಂತರ ಬಾಯಿಯ ಫೋಟೋಗಳನ್ನು ಸೇರಿಸಲು ರೋಗಿಯ ದಾಖಲೆಯನ್ನು ತೆರೆಯಿರಿ. ಅಪ್‌ಲೋಡ್ ಮಾಡುವ ಮೊದಲು ಫೋಟೋ ಒಪ್ಪಿಗೆಯನ್ನು ದಾಖಲಿಸಿ.",
-  "File uploads are unavailable. Contact your workspace administrator.": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಲಭ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳ ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ."
+  "File uploads are unavailable. Contact your workspace administrator.": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಲಭ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳ ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+  "Offline capture queue": "ಆಫ್‌ಲೈನ್ ದಾಖಲೆ ಮತ್ತು ಚಿತ್ರಗಳ ಸರತಿ",
+  "Sync pending records": "ಬಾಕಿ ದಾಖಲೆಗಳನ್ನು ಸಿಂಕ್ ಮಾಡಿ",
+  "No pending records": "ಬಾಕಿ ದಾಖಲೆಗಳಿಲ್ಲ"
 }

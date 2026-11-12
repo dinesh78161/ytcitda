@@ -804,5 +804,8 @@
   "Analyse image": "படத்தைப் பகுப்பாய்வு செய்",
   "For clinician review": "மருத்துவரின் மதிப்பாய்விற்காக",
   "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "சேமித்த பிறகு வாய்ப் புகைப்படங்களைச் சேர்க்க நோயாளியின் பதிவைத் திறக்கவும். பதிவேற்றுவதற்கு முன் புகைப்பட ஒப்புதலைப் பதிவு செய்யவும்.",
-  "File uploads are unavailable. Contact your workspace administrator.": "கோப்புப் பதிவேற்றம் கிடைக்கவில்லை. பணியிட நிர்வாகியைத் தொடர்புகொள்ளவும்."
+  "File uploads are unavailable. Contact your workspace administrator.": "கோப்புப் பதிவேற்றம் கிடைக்கவில்லை. பணியிட நிர்வாகியைத் தொடர்புகொள்ளவும்.",
+  "Offline capture queue": "ஆஃப்லைன் பதிவுகள் மற்றும் படங்களின் வரிசை",
+  "Sync pending records": "நிலுவைப் பதிவுகளை ஒத்திசைக்கவும்",
+  "No pending records": "நிலுவைப் பதிவுகள் இல்லை"
 }

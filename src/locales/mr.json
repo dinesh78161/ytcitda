@@ -804,5 +804,8 @@
   "Analyse image": "प्रतिमेचे विश्लेषण करा",
   "For clinician review": "वैद्यकीय पुनरावलोकनासाठी",
   "After saving, open the patient record to add oral photographs. Record photo consent before uploading.": "जतन केल्यानंतर तोंडाचे फोटो जोडण्यासाठी रुग्णाची नोंद उघडा. अपलोड करण्यापूर्वी फोटोची संमती नोंदवा.",
-  "File uploads are unavailable. Contact your workspace administrator.": "फाइल अपलोड उपलब्ध नाही. आपल्या कार्यक्षेत्र प्रशासकाशी संपर्क साधा."
+  "File uploads are unavailable. Contact your workspace administrator.": "फाइल अपलोड उपलब्ध नाही. आपल्या कार्यक्षेत्र प्रशासकाशी संपर्क साधा.",
+  "Offline capture queue": "ऑफलाइन नोंदी आणि छायाचित्रांची रांग",
+  "Sync pending records": "प्रलंबित नोंदी समक्रमित करा",
+  "No pending records": "प्रलंबित नोंदी नाहीत"
 }

@@ -5,6 +5,7 @@ import {
   fetchWorkspace,
   isCloud,
   isClinical,
+  offlineScope,
   verifyClinicalWorkspace,
   submitCloud,
   supabase,
@@ -28,6 +29,18 @@ import {
   setLocal,
 } from "./storage";
 import {
+  captureSnapshot,
+  loadOffline,
+  offlineDrafts,
+  projectDrafts,
+  removeOfflineDraft,
+  saveOffline,
+  saveOfflineDraft,
+  validOfflineSession,
+  type OfflineSession,
+} from "./offline";
+import { hasConsent } from "./care-workflows";
+import {
   emptyData,
   type Command,
   type Draft,
@@ -37,7 +50,7 @@ import {
 } from "./types";
 
 export function useWorkspace() {
-  const sessionForm = useRef<unknown>(null);
+  const sessionExpiresAt = useRef(0);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [authRevision, setAuthRevision] = useState(0);
   const authGeneration = useRef(0);
@@ -106,29 +119,72 @@ export function useWorkspace() {
   const lock = useRef(false),
     syncing = useRef(false),
     generation = useRef(0);
-  const scope = isCloud ? "supabase" : "demo";
+  const scope = isCloud ? offlineScope : "demo";
+  const readDrafts = useCallback(
+    (actor: string) =>
+      isCloud ? offlineDrafts(scope, actor) : listDrafts(actor, scope),
+    [scope],
+  );
+  const writeDraft = useCallback(
+    (draft: Draft) =>
+      isCloud ? saveOfflineDraft(scope, draft) : queueDraft(draft, scope),
+    [scope],
+  );
+  const deleteDraft = useCallback(
+    (actor: string, id: string) =>
+      isCloud ? removeOfflineDraft(scope, actor, id) : removeDraft(id),
+    [scope],
+  );
   const refresh = useCallback(
     async (actor: Profile) => {
       const version = ++generation.current;
+      const cached =
+        isCloud && !navigator.onLine
+          ? await loadOffline<OfflineSession>(scope, actor.id, "session")
+          : undefined;
+      if (isCloud && !navigator.onLine && !cached)
+        throw new Error(
+          "Open this workspace online before using offline capture.",
+        );
       const next = isCloud
-        ? await fetchWorkspace(actor)
+        ? cached
+          ? { data: cached.data, summary: null }
+          : await fetchWorkspace(actor)
         : { data: await loadDemo(), summary: null };
       if (version !== generation.current) return;
-      const visible = isCloud ? next.data : visibleDemo(next.data, actor.role);
+      if (isCloud && navigator.onLine && actor.role === "health_worker")
+        await saveOffline(scope, actor.id, "session", {
+          profile: actor,
+          verified_at: Date.now(),
+          data: captureSnapshot(next.data, actor),
+        } satisfies OfflineSession);
+      const pending = await readDrafts(actor.id);
+      if (version !== generation.current) return;
+      // Demo registrations keep their existing queue-only behavior; cloud drafts
+      // must be visible so a worker can photograph a newly registered patient.
+      const visible = isCloud
+        ? projectDrafts(next.data, actor, pending, isClinical)
+        : projectDrafts(
+            visibleDemo(next.data, actor.role),
+            actor,
+            pending.filter((d) => d.action === "image"),
+            false,
+          );
       setData(visible);
       setSummary(
         next.summary ??
           summarize(actor.role === "district_admin" ? next.data : visible),
       );
-      setDrafts(isClinical ? [] : await listDrafts(actor.id, scope));
+      setDrafts(pending);
       setError("");
     },
-    [scope],
+    [scope, readDrafts],
   );
   useEffect(() => {
     let alive = true;
     let sessionUserId: string | undefined;
-    const enter = async (id?: string) => {
+    const enter = async (id?: string, expiresAt = 0) => {
+      sessionExpiresAt.current = expiresAt;
       sessionUserId = id;
       const authVersion = ++authGeneration.current;
       ++generation.current;
@@ -136,13 +192,27 @@ export function useWorkspace() {
       setData(emptyData());
       setSummary(summarize(emptyData()));
       setDrafts([]);
-      sessionForm.current = null;
       setMfaRequired(false);
       try {
         if (configurationError) throw new Error(configurationError);
         if (isCloud && !id) {
           setProfile(null);
           setData(emptyData());
+          return;
+        }
+        if (isCloud && !navigator.onLine) {
+          const cached = await loadOffline<OfflineSession>(
+            scope,
+            id!,
+            "session",
+          );
+          if (!validOfflineSession(cached, id!, expiresAt))
+            throw new Error(
+              "Reconnect and sign in before using offline capture on this device.",
+            );
+          if (!alive || authVersion !== authGeneration.current) return;
+          setProfile(cached!.profile);
+          await refresh(cached!.profile);
           return;
         }
         const actor = isCloud
@@ -187,7 +257,7 @@ export function useWorkspace() {
         if (error) {
           setError(error.message);
           setLoading(false);
-        } else void enter(data.session?.user.id);
+        } else void enter(data.session?.user.id, data.session?.expires_at);
       });
     } else void enter();
     const subscription = supabase?.auth.onAuthStateChange((event, session) => {
@@ -206,7 +276,7 @@ export function useWorkspace() {
           // Keep the mounted patient form when the account has not changed.
           if (event === "SIGNED_IN" && session?.user.id === sessionUserId)
             return;
-          void enter(session?.user.id);
+          void enter(session?.user.id, session?.expires_at);
         }, 0);
     });
     const on = () => setOnline(true),
@@ -219,7 +289,7 @@ export function useWorkspace() {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
     };
-  }, [refresh, authRevision]);
+  }, [refresh, authRevision, scope]);
 
   const execute = useCallback(
     async (
@@ -230,8 +300,13 @@ export function useWorkspace() {
       if (!profile) throw new Error("Sign in first.");
       if (mfaRequired) throw new Error("Verify your authenticator code first.");
       if (lock.current) throw new Error("Please wait for the current action.");
+      if (syncing.current && !retryId)
+        throw new Error("Please wait for pending uploads to finish.");
       lock.current = true;
       setBusy(true);
+      const queueable =
+        ["register", "image"].includes(action) &&
+        profile.role === "health_worker";
       const command: Command = {
         id:
           retryId ??
@@ -243,29 +318,106 @@ export function useWorkspace() {
         payload,
         created_at: new Date().toISOString(),
       };
+      let queued: Draft | undefined;
       try {
-        if (isClinical && !navigator.onLine)
-          throw new Error(
-            "Reconnect before saving clinical records. This form is kept only for the current session.",
-          );
-        if (action === "register" && !isClinical) {
-          await queueDraft(
-            {
-              id: command.id,
-              actor: profile.id,
-              payload,
-              created_at: command.created_at,
-              status: "pending",
-            },
+        if (isCloud && !navigator.onLine) {
+          const cached = await loadOffline<OfflineSession>(
             scope,
+            profile.id,
+            "session",
           );
+          if (
+            !validOfflineSession(cached, profile.id, sessionExpiresAt.current)
+          )
+            throw new Error(
+              "Reconnect and sign in before saving offline on this device.",
+            );
+        }
+        if (isCloud && action === "image" && !retryId)
+          command.id = await uploadRequestId(profile.id, "oral", payload);
+        if (action === "delete_image") {
+          const id = String(payload.image_id ?? payload.id);
+          const pending = (await readDrafts(profile.id)).find(
+            (d) => d.id === id && d.action === "image",
+          );
+          if (pending) {
+            await deleteDraft(profile.id, id);
+            setDrafts(await readDrafts(profile.id));
+            setData((current) => ({
+              ...current,
+              images: current.images.filter((image) => image.id !== id),
+            }));
+            return "saved" as const;
+          }
+        }
+        if (
+          action === "analyze" &&
+          data.images.some(
+            (image) => image.id === payload.image_id && image.pending_sync,
+          )
+        )
+          throw new Error("Sync this photo before requesting analysis.");
+        if (queueable) {
+          if (
+            action === "image" &&
+            data.screenings
+              .filter((screen) => screen.patient_id === payload.patient_id)
+              .sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+              ?.status === "closed"
+          )
+            throw new Error("Reopen this case before capturing a photo.");
+          if (
+            action === "image" &&
+            (!hasConsent(data, String(payload.patient_id), "image_capture") ||
+              !hasConsent(data, String(payload.patient_id), "screening"))
+          )
+            throw new Error(
+              "Current screening and photo consent are required.",
+            );
+          if (action === "register" && payload.consent !== true)
+            throw new Error("Record screening consent before saving.");
+          const previous = (await readDrafts(profile.id)).find(
+            (d) => d.id === command.id,
+          );
+          queued = {
+            id: command.id,
+            actor: profile.id,
+            action: action as Draft["action"],
+            payload,
+            created_at: previous?.created_at ?? command.created_at,
+            status: "pending",
+          };
+          await writeDraft(queued);
           if (!navigator.onLine) {
-            setDrafts(await listDrafts(profile.id, scope));
+            const pending = await readDrafts(profile.id);
+            setDrafts(pending);
+            if (isCloud || action === "image") {
+              setData(projectDrafts(data, profile, pending, isClinical));
+              setSummary(
+                summarize(projectDrafts(data, profile, pending, isClinical)),
+              );
+            }
             return "queued" as const;
           }
+          if (
+            action === "image" &&
+            !retryId &&
+            (await readDrafts(profile.id)).some(
+              (d) =>
+                (d.action ?? "register") === "register" &&
+                d.payload.patient_id === payload.patient_id,
+            )
+          ) {
+            const pending = await readDrafts(profile.id);
+            setDrafts(pending);
+            setData(projectDrafts(data, profile, pending, isClinical));
+            return "queued" as const;
+          }
+          await writeDraft({ ...queued, status: "uploading" });
+          setDrafts(await readDrafts(profile.id));
         } else if (!navigator.onLine)
           throw new Error(
-            "Reconnect before changing clinical records. Registration drafts can be saved offline.",
+            "Reconnect before changing clinical records. Screenings and photos can be saved to the offline queue.",
           );
         if (isCloud && action === "delete_image")
           await careApi("delete", {
@@ -290,23 +442,16 @@ export function useWorkspace() {
           await careApi("analyze", payload);
         else if (isCloud) await submitCloud(command);
         else await mutateDemo(profile, command);
-        if (action === "register") await removeDraft(command.id);
+        if (queued) await deleteDraft(profile.id, command.id);
         await refresh(profile);
         return "saved" as const;
       } catch (e) {
-        if (action === "register" && !isClinical) {
-          await queueDraft(
-            {
-              id: command.id,
-              actor: profile.id,
-              payload,
-              created_at: command.created_at,
-              status: "failed",
-              error: message(e),
-            },
-            scope,
-          );
-          setDrafts(await listDrafts(profile.id, scope));
+        if (queued) {
+          await writeDraft({ ...queued, status: "failed", error: message(e) });
+          const pending = await readDrafts(profile.id);
+          setDrafts(pending);
+          if (isCloud)
+            setData(projectDrafts(data, profile, pending, isClinical));
         }
         throw e;
       } finally {
@@ -314,19 +459,58 @@ export function useWorkspace() {
         setBusy(false);
       }
     },
-    [profile, refresh, scope, mfaRequired],
+    [
+      profile,
+      refresh,
+      scope,
+      mfaRequired,
+      data,
+      readDrafts,
+      writeDraft,
+      deleteDraft,
+    ],
   );
 
   const sync = useCallback(async () => {
-    if (isClinical) return;
     if (!profile || mfaRequired || syncing.current || !navigator.onLine) return;
+    if (lock.current) return;
     syncing.current = true;
     let failure = "";
     try {
-      for (const draft of await listDrafts(profile.id, scope)) {
+      const pending = await readDrafts(profile.id);
+      if (!pending.length) return;
+      // Revalidate the account, workspace and MFA with the server before replay.
+      if (isCloud) {
+        const actor = await fetchProfile(profile.id);
+        if (
+          actor.role !== profile.role ||
+          actor.facility_id !== profile.facility_id
+        )
+          throw new Error(
+            "Your staff access changed. Sign in again before syncing.",
+          );
+        await verifyClinicalWorkspace();
+        const assurance =
+          await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (assurance.error) throw assurance.error;
+        if (
+          requiresSecondFactor(
+            actor.role,
+            assurance.data.currentLevel,
+            assurance.data.nextLevel,
+          )
+        )
+          throw new Error("Verify your authenticator code before syncing.");
+      }
+      const blocked = new Set<string>();
+      for (const draft of pending) {
+        if (!navigator.onLine) break;
+        const patientId = String(draft.payload.patient_id);
+        if (blocked.has(patientId)) continue;
         try {
-          await execute("register", draft.payload, draft.id);
+          await execute(draft.action ?? "register", draft.payload, draft.id);
         } catch (e) {
+          blocked.add(patientId);
           failure = message(e);
           setError(failure);
         }
@@ -335,11 +519,18 @@ export function useWorkspace() {
       syncing.current = false;
     }
     if (failure) throw new Error(failure);
-  }, [profile, scope, execute, mfaRequired]);
+  }, [profile, scope, execute, mfaRequired, readDrafts]);
   useEffect(() => {
     if (online && profile && !mfaRequired)
       void sync().catch((e) => setError(message(e)));
   }, [online, profile?.id, mfaRequired]); // Retry only on reconnect/session change.
+  useEffect(() => {
+    // Also recover API outages while the browser still reports an online link.
+    const timer = setInterval(() => {
+      if (navigator.onLine) void sync().catch((e) => setError(message(e)));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [sync]);
   return {
     services,
     refreshServices,
@@ -380,18 +571,34 @@ export function useWorkspace() {
       setProfile(null);
       setMfaRequired(false);
       setData(emptyData());
-      sessionForm.current = null;
+      if (profile && isCloud) {
+        await saveOffline(scope, profile.id, "session", null);
+        await saveOffline(scope, profile.id, "form", null);
+      }
+      setDrafts([]);
     },
     saveForm: async (value: unknown) => {
-      if (isClinical) {
-        sessionForm.current = value;
-        return;
+      if (isCloud && profile) {
+        if (!navigator.onLine) {
+          const cached = await loadOffline<OfflineSession>(
+            scope,
+            profile.id,
+            "session",
+          );
+          if (
+            !validOfflineSession(cached, profile.id, sessionExpiresAt.current)
+          )
+            throw new Error(
+              "Reconnect and sign in before saving offline on this device.",
+            );
+        }
+        return saveOffline(scope, profile.id, "form", value);
       }
       if (profile) await setLocal(`form:${scope}:${profile.id}`, value);
     },
     loadForm: async () =>
-      isClinical
-        ? (sessionForm.current as Record<string, unknown> | undefined)
+      isCloud && profile
+        ? await loadOffline<Record<string, unknown>>(scope, profile.id, "form")
         : profile
           ? await getLocal<Record<string, unknown>>(
               `form:${scope}:${profile.id}`,

@@ -390,11 +390,11 @@ test("offline registration survives reload and reconnects exactly once", async (
   await context.setOffline(true);
   await register(page, "Synthetic Offline Patient");
   await expect(
-    page.getByRole("button", { name: /1 · Offline registration queue/ }),
+    page.getByRole("button", { name: /1 · Offline capture queue/ }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("button", { name: /1 · Offline registration queue/ }),
+    page.getByRole("button", { name: /1 · Offline capture queue/ }),
   ).toBeVisible();
   await context.setOffline(false);
   await expect(

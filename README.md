@@ -47,7 +47,7 @@ server serves both the frontend and API; use `npm run build:render` and `npm sta
   Hindi, Tamil, Kannada, Malayalam, Marathi, Bengali, and Odia. See
   [language setup and Gemini reports](docs/LANGUAGES.md).
 - Registration, consent and screening intake; clinical drafts stay in session memory.
-- IndexedDB demo persistence, offline registration queue and reconnect retries.
+- IndexedDB demo persistence, encrypted cloud screening/photo drafts and reconnect retries. See [Offline capture](docs/OFFLINE_CAPTURE.md).
 - Oral-photo upload, decoded image validation, exposure/blur checks and retake guidance.
 - A bundled MobileNetV3 oral-image classifier runs real CPU inference inside the
   Node service without an external model API. Its benign/malignant dataset-class
@@ -117,10 +117,11 @@ Use the [demo runbook](docs/DEMO_RUNBOOK.md) to walk through the nine-step flow.
   Hosted AI defaults to labelled `mock-v1` when no research endpoint is configured.
   `SCREENING_AI_MODE=research` requires a version-pinned provider and never falls back to mock.
   Image quality remains an uncalibrated prototype. Research results require clinician review.
-- Offline storage contains synthetic records only and is not encrypted by this app.
-  Supabase offline registration requires an existing session and waits for server
-  acknowledgement on reconnect. Background sync across all Android browsers is not
-  guaranteed. Historical cloud records are not cached for offline reading.
+- Cloud offline capture encrypts health worker drafts, queued photographs and a
+  limited snapshot of their own screening records. It requires a current login;
+  sync waits for server acknowledgement. Local demo storage is unencrypted.
+  Background sync while the app is closed is not provided. See the
+  [offline storage limits and recovery steps](docs/OFFLINE_CAPTURE.md).
 - Staff assignment is administered through Supabase. A self-service administration UI
   and immediate revocation of already issued provider tokens remain pending.
   Privileged MFA is implemented and tested in the updated source; migration 006
