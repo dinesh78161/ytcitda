@@ -434,17 +434,15 @@ export default function OralAnalysis({
                 </span>
                 <h3>{copy("Image observations", "చిత్ర పరిశీలనలు")}</h3>
               </div>
-              <span className="analysis-mode">
-                {isClinical
-                  ? copy(
-                      "AI DRAFT · CLINICIAN REVIEW REQUIRED",
-                      "AI ముసాయిదా · వైద్య సమీక్ష అవసరం",
-                    )
-                  : localMode &&
-                      (!result || result.model_version === "oral-mendeley-v1")
+              {!(
+                localMode &&
+                (!result || result.model_version === "oral-mendeley-v1")
+              ) && (
+                <span className="analysis-mode">
+                  {isClinical
                     ? copy(
-                        "TRAINED ORAL MODEL · UNDER VALIDATION",
-                        "శిక్షణ పొందిన నోటి మోడల్ · ధృవీకరణలో ఉంది",
+                        "AI DRAFT · CLINICIAN REVIEW REQUIRED",
+                        "AI ముసాయిదా · వైద్య సమీక్ష అవసరం",
                       )
                     : medgemmaMode
                       ? copy(
@@ -459,7 +457,8 @@ export default function OralAnalysis({
                         : mock
                           ? copy("SIMULATED ANALYSIS", "అనుకరణ విశ్లేషణ")
                           : copy("RESEARCH EVALUATION", "పరిశోధన మూల్యాంకనం")}
-              </span>
+                </span>
+              )}
             </div>
 
             {/* Top action button: prominent and visible without scrolling */}
