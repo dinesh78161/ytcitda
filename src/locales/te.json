@@ -1,7 +1,5 @@
 {
   "Awaiting clinician review.": "వైద్యుని సమీక్ష కోసం వేచి ఉంది.",
-  "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.": "విశ్లేషణ సమయ పరిమితిలో జెమినీ స్పందించలేదు. తర్వాత మళ్లీ ప్రయత్నించండి; విశ్లేషణ సేవ్ కాలేదు.",
-  "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.": "మళ్లీ ప్రయత్నించినా సర్వర్ జెమినీకి కనెక్ట్ కాలేదు. Googleతో హోస్టింగ్ కనెక్షన్‌ను తనిఖీ చేయమని నిర్వాహకుడిని అడగండి; విశ్లేషణ సేవ్ కాలేదు.",
   "Clinical reports": "వైద్య నివేదికలు",
   "Screening, referral and care summaries for records you can access.": "మీరు చూడగల రికార్డుల పరీక్షలు, సిఫార్సులు మరియు సంరక్షణ సారాంశాలు.",
   "Clinical workspace": "క్లినికల్ వర్క్‌స్పేస్",
@@ -26,7 +24,6 @@
   "Automated disease analysis is not enabled in this clinical workspace.": "ఈ క్లినికల్ వర్క్‌స్పేస్‌లో ఆటోమేటెడ్ వ్యాధి విశ్లేషణ ప్రారంభించబడలేదు.",
   "RESEARCH IMAGE REVIEW": "పరిశోధన చిత్ర సమీక్ష",
   "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED": "పరిశోధన నమూనా · క్లినీషియన్ సమీక్ష అవసరం",
-  "GEMINI · RESEARCH ONLY": "జెమిని · పరిశోధన కోసం మాత్రమే",
   "MOCK WORKFLOW TEST": "మాక్ వర్క్‌ఫ్లో పరీక్ష",
   "RESEARCH EVALUATION": "పరిశోధన మూల్యాంకనం",
   "IMAGE OBSERVATIONS": "చిత్ర పరిశీలనలు",
@@ -54,7 +51,6 @@
   "Research AI (optional)": "పరిశోధన AI (ఐచ్ఛికం)",
   "Not enabled for clinical use": "క్లినికల్ వినియోగం కోసం ప్రారంభించబడలేదు",
   "Mock workflow test": "మాక్ వర్క్‌ఫ్లో పరీక్ష",
-  "Google Gemini · Research only": "Google జెమిని · పరిశోధన కోసం మాత్రమే",
   "Local image checks": "స్థానిక చిత్ర తనిఖీలు",
   "Care workspace": "సంరక్షణ కార్యస్థలం",
   "Image quality checks assess exposure and sharpness, not disease.": "చిత్ర నాణ్యత తనిఖీలు కాంతి మరియు స్పష్టతను అంచనా వేస్తాయి, వ్యాధిని కాదు.",
@@ -71,5 +67,8 @@
   "Sync pending records": "పెండింగ్ రికార్డులను పంపండి",
   "No pending records": "పెండింగ్ రికార్డులు లేవు",
   "Re-analyse photograph": "ఫోటోను మళ్లీ విశ్లేషించండి",
-  "Analyse oral photograph": "నోటి ఫోటోను విశ్లేషించండి"
+  "Analyse oral photograph": "నోటి ఫోటోను విశ్లేషించండి",
+  "Image analysis did not respond within the analysis time limit. Try again later; no analysis was saved.": "విశ్లేషణ సమయ పరిమితిలో AI స్పందించలేదు. తర్వాత మళ్లీ ప్రయత్నించండి; విశ్లేషణ సేవ్ కాలేదు.",
+  "The server could not connect to the image analysis service after retrying. Ask your administrator to check the hosting connection; no analysis was saved.": "మళ్లీ ప్రయత్నించినా సర్వర్ AIకి కనెక్ట్ కాలేదు. Googleతో హోస్టింగ్ కనెక్షన్‌ను తనిఖీ చేయమని నిర్వాహకుడిని అడగండి; విశ్లేషణ సేవ్ కాలేదు.",
+  "Clinical reference image ready for image analysis": "చిత్ర విశ్లేషణ కోసం క్లినికల్ సూచన చిత్రం సిద్ధంగా ఉంది"
 }

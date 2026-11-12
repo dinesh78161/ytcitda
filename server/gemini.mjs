@@ -104,14 +104,14 @@ export function validateGeminiFindings(value, engine = "gemini") {
           text(c.visual_basis, 500),
       ),
     502,
-    "Gemini returned an invalid findings report. No analysis was saved.",
+    "Image analysis returned an invalid findings report. No analysis was saved.",
   );
   requireValue(
     value.image_kind === "oral_photo" ||
       (value.visible_findings.length === 0 &&
         value.possible_conditions.length === 0),
     502,
-    "Gemini returned inconsistent findings for an unsuitable image. No analysis was saved.",
+    "Image analysis returned inconsistent findings for an unsuitable image. No analysis was saved.",
   );
   // The clinical v1 contract and historical reports have no oral_assessment.
   // When present, the structured conclusion must agree with its evidence.
@@ -171,18 +171,18 @@ export async function analyzeWithGemini({
   requireValue(
     typeof key === "string" && key.trim().length > 0,
     503,
-    "Gemini is not configured on the server. Ask your workspace administrator to finish AI setup.",
+    "Image analysis is not configured on the server. Ask your workspace administrator to finish AI setup.",
   );
   requireValue(
     /^(gemini|medgemma|gemma)-[a-z0-9][a-z0-9.\-]{0,100}$/.test(model),
     503,
-    "Configure a valid Gemini model ID.",
+    "Configure a valid image analysis model ID.",
   );
   const signal = AbortSignal.timeout(timeoutMs);
   const timeoutError = () =>
     new HttpError(
       504,
-      "Gemini did not respond within the analysis time limit. Try again later; no analysis was saved.",
+      "Image analysis did not respond within the analysis time limit. Try again later; no analysis was saved.",
     );
   const request = {
     method: "POST",
@@ -241,7 +241,7 @@ export async function analyzeWithGemini({
           throw timeoutError();
         throw new HttpError(
           502,
-          "The server could not connect to Gemini after retrying. Ask your administrator to check the hosting connection to Google; no analysis was saved.",
+          "The server could not connect to the image analysis service after retrying. Ask your administrator to check the hosting connection; no analysis was saved.",
         );
       }
     }
@@ -255,10 +255,10 @@ export async function analyzeWithGemini({
     response.ok,
     response.status === 429 ? 429 : response.status >= 500 ? 503 : 502,
     response.status === 429
-      ? "Gemini usage limit reached. Try again later or ask your administrator to check the API quota."
+      ? "Image analysis usage limit reached. Try again later or ask your administrator to check the API quota."
       : response.status >= 500
-        ? "Gemini is temporarily unavailable or experiencing high demand. Try again later; no analysis was saved."
-        : "Gemini could not complete the request. Ask your administrator to check its API key and model access.",
+        ? "Image analysis is temporarily unavailable or experiencing high demand. Try again later; no analysis was saved."
+        : "Image analysis could not complete the request. Ask your administrator to check its API key and model access.",
   );
   let raw;
   try {
@@ -267,17 +267,21 @@ export async function analyzeWithGemini({
     if (signal.aborted) throw timeoutError();
     throw new HttpError(
       502,
-      "Gemini returned an unreadable response. No analysis was saved.",
+      "Image analysis returned an unreadable response. No analysis was saved.",
     );
   }
   const candidate = raw?.candidates?.[0];
   requireValue(
     !raw?.promptFeedback?.blockReason && candidate?.finishReason === "STOP",
     502,
-    "Gemini did not produce a complete report for this image. No analysis was saved.",
+    "Image analysis did not produce a complete report for this image. No analysis was saved.",
   );
   const parts = candidate?.content?.parts;
-  requireValue(Array.isArray(parts), 502, "Gemini returned no image findings.");
+  requireValue(
+    Array.isArray(parts),
+    502,
+    "Image analysis returned no image findings.",
+  );
   const output = parts
     .filter((p) => p.thought !== true && typeof p.text === "string")
     .map((p) => p.text)
@@ -285,7 +289,7 @@ export async function analyzeWithGemini({
   requireValue(
     output.length > 0 && output.length <= 16000,
     502,
-    "Gemini returned an invalid report length.",
+    "Image analysis returned an invalid report length.",
   );
   let parsed;
   try {
@@ -293,7 +297,7 @@ export async function analyzeWithGemini({
   } catch {
     throw new HttpError(
       502,
-      "Gemini returned an unreadable findings report. No analysis was saved.",
+      "Image analysis returned an unreadable findings report. No analysis was saved.",
     );
   }
   requireValue(

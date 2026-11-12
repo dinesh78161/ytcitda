@@ -1802,8 +1802,8 @@ function PatientDetail({
                               <span>
                                 {localize(
                                   lang,
-                                  "Authentic NIH clinical reference image ready for immediate Gemini analysis",
-                                  "వెంటనే Gemini AI విశ్లేషణ చేయడానికి ప్రామాణిక NIH క్లినికల్ చిత్రం",
+                                  "Clinical reference image ready for image analysis",
+                                  "చిత్ర విశ్లేషణ కోసం క్లినికల్ సూచన చిత్రం సిద్ధంగా ఉంది",
                                 )}
                               </span>
                             </div>

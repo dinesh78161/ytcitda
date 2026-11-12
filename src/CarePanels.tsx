@@ -1012,14 +1012,9 @@ export function IntegrationStatus() {
                 )
               : key === "ai" && w.services.ai_provider === "mock"
                 ? l("Mock workflow test", "మాక్ వర్క్‌ఫ్లో పరీక్ష")
-                : key === "ai" && w.services.ai_provider === "gemini"
-                  ? l(
-                      "Google Gemini · Research only",
-                      "Google Gemini · పరిశోధన కోసం మాత్రమే",
-                    )
-                  : w.services[key]
-                    ? l("Configured", "అమర్చబడింది")
-                    : l("Not configured", "అమర్చలేదు")}
+                : w.services[key]
+                  ? l("Configured", "అమర్చబడింది")
+                  : l("Not configured", "అమర్చలేదు")}
           </span>
         </div>
       ))}
