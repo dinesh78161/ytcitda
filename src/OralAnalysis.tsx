@@ -434,31 +434,27 @@ export default function OralAnalysis({
                 </span>
                 <h3>{copy("Image observations", "చిత్ర పరిశీలనలు")}</h3>
               </div>
-              {!(
-                localMode &&
-                (!result || result.model_version === "oral-mendeley-v1")
-              ) && (
-                <span className="analysis-mode">
-                  {isClinical
-                    ? copy(
-                        "AI DRAFT · CLINICIAN REVIEW REQUIRED",
-                        "AI ముసాయిదా · వైద్య సమీక్ష అవసరం",
-                      )
-                    : medgemmaMode
+              {(isClinical || medgemmaMode || (!geminiMode && !visionResult)) &&
+                !(
+                  localMode &&
+                  (!result || result.model_version === "oral-mendeley-v1")
+                ) && (
+                  <span className="analysis-mode">
+                    {isClinical
                       ? copy(
-                          "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
-                          "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
+                          "AI DRAFT · CLINICIAN REVIEW REQUIRED",
+                          "AI ముసాయిదా · వైద్య సమీక్ష అవసరం",
                         )
-                      : visionResult || (!result && geminiMode)
+                      : medgemmaMode
                         ? copy(
-                            "GEMINI · RESEARCH ONLY",
-                            "జెమిని · పరిశోధన కోసం మాత్రమే",
+                            "RESEARCH MODEL · CLINICIAN REVIEW REQUIRED",
+                            "పరిశోధన మోడల్ · వైద్య సమీక్ష అవసరం",
                           )
                         : mock
                           ? copy("SIMULATED ANALYSIS", "అనుకరణ విశ్లేషణ")
                           : copy("RESEARCH EVALUATION", "పరిశోధన మూల్యాంకనం")}
-                </span>
-              )}
+                  </span>
+                )}
             </div>
 
             {/* Top action button: prominent and visible without scrolling */}
@@ -528,12 +524,12 @@ export default function OralAnalysis({
                             : geminiMode
                               ? result
                                 ? copy(
-                                    "Re-analyse with Gemini",
-                                    "జెమినితో మళ్లీ విశ్లేషించండి",
+                                    "Re-analyse photograph",
+                                    "ఫోటోను మళ్లీ విశ్లేషించండి",
                                   )
                                 : copy(
                                     "Analyse oral photograph",
-                                    "జెమినితో విశ్లేషించండి",
+                                    "నోటి ఫోటోను విశ్లేషించండి",
                                   )
                               : copy(
                                   "Analyse image",

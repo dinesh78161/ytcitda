@@ -807,5 +807,7 @@
   "File uploads are unavailable. Contact your workspace administrator.": "ଫାଇଲ୍ ଅପଲୋଡ୍ ଉପଲବ୍ଧ ନାହିଁ। କାର୍ଯ୍ୟକ୍ଷେତ୍ର ପ୍ରଶାସକଙ୍କୁ ସମ୍ପର୍କ କରନ୍ତୁ।",
   "Offline capture queue": "ଅଫଲାଇନ୍ ରେକର୍ଡ ଓ ଫଟୋ ଧାଡ଼ି",
   "Sync pending records": "ବାକି ରେକର୍ଡ ସିଙ୍କ କରନ୍ତୁ",
-  "No pending records": "କୌଣସି ବାକି ରେକର୍ଡ ନାହିଁ"
+  "No pending records": "କୌଣସି ବାକି ରେକର୍ଡ ନାହିଁ",
+  "Re-analyse photograph": "ଫଟୋଟି ପୁଣି ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
+  "Analyse oral photograph": "ମୁଖର ଫଟୋ ବିଶ୍ଳେଷଣ କରନ୍ତୁ"
 }

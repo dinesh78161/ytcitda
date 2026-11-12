@@ -807,5 +807,7 @@
   "File uploads are unavailable. Contact your workspace administrator.": "கோப்புப் பதிவேற்றம் கிடைக்கவில்லை. பணியிட நிர்வாகியைத் தொடர்புகொள்ளவும்.",
   "Offline capture queue": "ஆஃப்லைன் பதிவுகள் மற்றும் படங்களின் வரிசை",
   "Sync pending records": "நிலுவைப் பதிவுகளை ஒத்திசைக்கவும்",
-  "No pending records": "நிலுவைப் பதிவுகள் இல்லை"
+  "No pending records": "நிலுவைப் பதிவுகள் இல்லை",
+  "Re-analyse photograph": "புகைப்படத்தை மீண்டும் பகுப்பாய்வு செய்யவும்",
+  "Analyse oral photograph": "வாயின் புகைப்படத்தைப் பகுப்பாய்வு செய்யவும்"
 }

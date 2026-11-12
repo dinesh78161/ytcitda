@@ -116,7 +116,7 @@ function render({
 test("configured image understanding remains the default when the lesion classifier is loaded", () => {
   const html = render();
   assert.match(html, /Analyse oral photograph/);
-  assert.match(html, /GEMINI/);
+  assert.doesNotMatch(html, /GEMINI|Re-analyse with Gemini/);
   assert.doesNotMatch(
     html,
     /Analyse with oral model|Model class score|visible lesion is present/,

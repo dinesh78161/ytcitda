@@ -807,5 +807,7 @@
   "File uploads are unavailable. Contact your workspace administrator.": "ഫയൽ അപ്‌ലോഡ് ലഭ്യമല്ല. നിങ്ങളുടെ പ്രവർത്തനമേഖലയുടെ അഡ്മിനിസ്ട്രേറ്ററെ ബന്ധപ്പെടുക.",
   "Offline capture queue": "ഓഫ്‌ലൈൻ രേഖകളും ചിത്രങ്ങളും",
   "Sync pending records": "തീർപ്പാക്കാത്ത രേഖകൾ സമന്വയിപ്പിക്കുക",
-  "No pending records": "തീർപ്പാക്കാത്ത രേഖകളില്ല"
+  "No pending records": "തീർപ്പാക്കാത്ത രേഖകളില്ല",
+  "Re-analyse photograph": "ഫോട്ടോ വീണ്ടും വിശകലനം ചെയ്യുക",
+  "Analyse oral photograph": "വായയുടെ ഫോട്ടോ വിശകലനം ചെയ്യുക"
 }
