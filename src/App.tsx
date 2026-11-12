@@ -40,6 +40,7 @@ import {
   Maximize2,
   Menu,
   Minimize2,
+  Phone,
   Plus,
   RefreshCw,
   Search,
@@ -2680,66 +2681,94 @@ function FollowUps({ openPatient }: { openPatient: (id: string) => void }) {
         </button>
       </div>
       <div className="task-list">
-        {tasks.map((task) => (
-          <article className="panel task-card" key={task.id}>
-            <span
-              className={`metric-icon ${task.task_type === "missed_visit" ? "orange" : "green"}`}
-            >
-              <HeartHandshake size={24} />
-            </span>
-            <div className="task-copy">
-              <span className="eyebrow dark">
-                {statusLabel(task.task_type, lang)}
-              </span>
-              <button
-                className="text-button task-name"
-                onClick={() => openPatient(task.patient_id)}
+        {tasks.map((task) => {
+          const patient = w.data.patients.find((p) => p.id === task.patient_id);
+          const phone = patient?.contact_phone?.trim() ?? "";
+          const dialNumber = phone.replace(/[^\d+]/g, "");
+          const canCall = /^\+?\d{7,15}$/.test(dialNumber);
+          return (
+            <article className="panel task-card" key={task.id}>
+              <span
+                className={`metric-icon ${task.task_type === "missed_visit" ? "orange" : "green"}`}
               >
-                {w.data.patients.find((p) => p.id === task.patient_id)
-                  ?.display_name ?? shortId(task.patient_id)}
-                <ArrowUpRight size={14} />
-              </button>
-              <small>
-                {t("due")} {dateLabel(task.due_at, lang)} ·{" "}
-                {shortId(task.patient_id)}
-              </small>
-            </div>
-            <Badge status={task.status} />
-            {canEdit && task.status === "pending" && (
-              <div className="task-actions">
+                <HeartHandshake size={24} />
+              </span>
+              <div className="task-copy">
+                <span className="eyebrow dark">
+                  {statusLabel(task.task_type, lang)}
+                </span>
                 <button
-                  className="button secondary"
-                  disabled={w.busy}
-                  onClick={() =>
-                    void run(() =>
-                      w.execute("followup", {
-                        task_id: task.id,
-                        status: "completed",
-                      }),
-                    )
-                  }
+                  className="text-button task-name"
+                  onClick={() => openPatient(task.patient_id)}
                 >
-                  <Check size={16} />
-                  {t("completeTask")}
+                  {patient?.display_name ?? shortId(task.patient_id)}
+                  <ArrowUpRight size={14} />
                 </button>
-                <button
-                  className="text-button muted"
-                  disabled={w.busy}
-                  onClick={() =>
-                    void run(() =>
-                      w.execute("followup", {
-                        task_id: task.id,
-                        status: "lost_contact",
-                      }),
-                    )
-                  }
-                >
-                  {t("lostContact")}
-                </button>
+                {canCall ? (
+                  <a
+                    className="task-phone"
+                    href={`tel:${dialNumber}`}
+                    aria-label={`${localize(lang, "Call patient", "రోగికి కాల్ చేయండి")}: ${phone}`}
+                  >
+                    <Phone size={15} aria-hidden="true" />
+                    <bdi>{phone}</bdi>
+                  </a>
+                ) : (
+                  <span className="task-phone muted">
+                    <Phone size={15} aria-hidden="true" />
+                    {phone ? (
+                      <bdi>{phone}</bdi>
+                    ) : (
+                      localize(
+                        lang,
+                        "No phone number recorded",
+                        "ఫోన్ నంబర్ నమోదు కాలేదు",
+                      )
+                    )}
+                  </span>
+                )}
+                <small>
+                  {t("due")} {dateLabel(task.due_at, lang)} ·{" "}
+                  {shortId(task.patient_id)}
+                </small>
               </div>
-            )}
-          </article>
-        ))}
+              <Badge status={task.status} />
+              {canEdit && task.status === "pending" && (
+                <div className="task-actions">
+                  <button
+                    className="button secondary"
+                    disabled={w.busy}
+                    onClick={() =>
+                      void run(() =>
+                        w.execute("followup", {
+                          task_id: task.id,
+                          status: "completed",
+                        }),
+                      )
+                    }
+                  >
+                    <Check size={16} />
+                    {t("completeTask")}
+                  </button>
+                  <button
+                    className="text-button muted"
+                    disabled={w.busy}
+                    onClick={() =>
+                      void run(() =>
+                        w.execute("followup", {
+                          task_id: task.id,
+                          status: "lost_contact",
+                        }),
+                      )
+                    }
+                  >
+                    {t("lostContact")}
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
       </div>
       {tasks.length === 0 && <Empty text={t("emptyTask")} />}
     </>
