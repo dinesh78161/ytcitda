@@ -2206,6 +2206,29 @@ tbody tr:hover {
   width: 100%;
   margin-top: 5px;
 }
+.password-input {
+  position: relative;
+}
+.password-input input {
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--green);
+}
+.password-toggle:hover {
+  background: #236c5410;
+}
 .login-form > .small {
   margin-top: 26px;
   font-size: 9px;

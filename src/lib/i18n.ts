@@ -273,6 +273,8 @@ export const labels = {
   signIn: ["Sign in", "సైన్ ఇన్"],
   email: ["Email", "ఇమెయిల్"],
   password: ["Password", "పాస్‌వర్డ్"],
+  showPassword: ["Show password", "పాస్‌వర్డ్ చూపించు"],
+  hidePassword: ["Hide password", "పాస్‌వర్డ్ దాచు"],
   loginText: [
     "Sign in with your provisioned care-team account.",
     "మీకు కేటాయించిన సంరక్షణ బృంద ఖాతాతో సైన్ ఇన్ చేయండి.",

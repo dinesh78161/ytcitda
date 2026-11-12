@@ -30,6 +30,7 @@ import {
   CloudOff,
   Database,
   Eye,
+  EyeOff,
   FileText,
   HeartHandshake,
   LayoutDashboard,
@@ -3003,6 +3004,7 @@ function Login({
   const { w, t } = useApp(),
     [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
+    [showPassword, setShowPassword] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const login = async (e: FormEvent) => {
@@ -3066,15 +3068,35 @@ function Login({
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </Field>
-              <Field label={t("password")}>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </Field>
+              <div className="field">
+                <label htmlFor="login-password">{t("password")}</label>
+                <div className="password-input">
+                  <input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    aria-label={t(
+                      showPassword ? "hidePassword" : "showPassword",
+                    )}
+                    title={t(showPassword ? "hidePassword" : "showPassword")}
+                    aria-controls="login-password"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} aria-hidden="true" />
+                    ) : (
+                      <Eye size={18} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
               {(error || w.error) && (
                 <div className="error-box" role="alert">
                   {localize(lang, error || w.error || "")}
